@@ -32,12 +32,23 @@ const loader = document.createElement('div');
 loader.innerHTML = '<div style="position:fixed;top:0;left:0;width:100%;height:100%;background:var(--bg-color);z-index:9999;display:flex;align-items:center;justify-content:center;color:var(--primary);font-size:1.5rem;font-weight:bold;"><i class="fas fa-spinner fa-spin" style="margin-right:10px;"></i> Syncing Data...</div>';
 document.documentElement.appendChild(loader);
 
+function normalizeArray(data) {
+  if (typeof data === 'object' && data !== null) {
+    if (!Array.isArray(data)) {
+      data = Object.values(data);
+    }
+    return data.filter(item => item !== null && item !== undefined);
+  }
+  return Array.isArray(data) ? data.filter(item => item !== null && item !== undefined) : [];
+}
+
 Promise.all(SYNC_KEYS.map(key => get(ref(db, key)))).then(snapshots => {
   isSyncingFromFirebase = true;
   snapshots.forEach((snapshot, index) => {
     const key = SYNC_KEYS[index];
     if (snapshot.exists()) {
-      originalSetItem.call(localStorage, key, JSON.stringify(snapshot.val()));
+      const data = normalizeArray(snapshot.val());
+      originalSetItem.call(localStorage, key, JSON.stringify(data));
     } else {
       // If it doesn't exist in Firebase, it means the array is empty. 
       // Do NOT migrate stale local data back to Firebase. Just clear local.
@@ -49,7 +60,8 @@ Promise.all(SYNC_KEYS.map(key => get(ref(db, key)))).then(snapshots => {
   // Real-time listeners
   SYNC_KEYS.forEach(key => {
     onValue(ref(db, key), (snapshot) => {
-      const data = snapshot.exists() ? snapshot.val() : [];
+      let data = snapshot.exists() ? snapshot.val() : [];
+      data = normalizeArray(data);
       const stringified = JSON.stringify(data);
       if (localStorage.getItem(key) !== stringified) {
         isSyncingFromFirebase = true;
