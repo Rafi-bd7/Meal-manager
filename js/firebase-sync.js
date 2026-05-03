@@ -39,14 +39,9 @@ Promise.all(SYNC_KEYS.map(key => get(ref(db, key)))).then(snapshots => {
     if (snapshot.exists()) {
       originalSetItem.call(localStorage, key, JSON.stringify(snapshot.val()));
     } else {
-      // Migrate local data to Firebase if Firebase is empty (first time)
-      const localData = localStorage.getItem(key);
-      if (localData && localData !== '[]') {
-        set(ref(db, key), JSON.parse(localData));
-      } else {
-        originalSetItem.call(localStorage, key, '[]');
-        set(ref(db, key), []);
-      }
+      // If it doesn't exist in Firebase, it means the array is empty. 
+      // Do NOT migrate stale local data back to Firebase. Just clear local.
+      originalSetItem.call(localStorage, key, '[]');
     }
   });
   isSyncingFromFirebase = false;
@@ -54,17 +49,16 @@ Promise.all(SYNC_KEYS.map(key => get(ref(db, key)))).then(snapshots => {
   // Real-time listeners
   SYNC_KEYS.forEach(key => {
     onValue(ref(db, key), (snapshot) => {
-      if (snapshot.exists()) {
-        const stringified = JSON.stringify(snapshot.val());
-        if (localStorage.getItem(key) !== stringified) {
-          isSyncingFromFirebase = true;
-          originalSetItem.call(localStorage, key, stringified);
-          isSyncingFromFirebase = false;
-          // Trigger storage event so admin.js / user.js UI re-renders automatically
-          const e = new Event('storage');
-          e.key = key;
-          window.dispatchEvent(e);
-        }
+      const data = snapshot.exists() ? snapshot.val() : [];
+      const stringified = JSON.stringify(data);
+      if (localStorage.getItem(key) !== stringified) {
+        isSyncingFromFirebase = true;
+        originalSetItem.call(localStorage, key, stringified);
+        isSyncingFromFirebase = false;
+        // Trigger storage event so admin.js / user.js UI re-renders automatically
+        const e = new Event('storage');
+        e.key = key;
+        window.dispatchEvent(e);
       }
     });
   });

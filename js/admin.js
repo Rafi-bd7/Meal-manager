@@ -149,6 +149,40 @@ function initAdminApp() {
     loadComments();
   }
 
+  // ─── Add New Member ───
+  document.getElementById('addNewMemberBtn')?.addEventListener('click', () => {
+    document.getElementById('newMemberPanel').classList.remove('hidden');
+  });
+  document.getElementById('cancelNewMember')?.addEventListener('click', () => {
+    document.getElementById('newMemberPanel').classList.add('hidden');
+    document.getElementById('newMemName').value = '';
+    document.getElementById('newMemEmail').value = '';
+    document.getElementById('newMemPassword').value = '';
+  });
+  document.getElementById('confirmNewMember')?.addEventListener('click', () => {
+    const name = document.getElementById('newMemName').value.trim();
+    const email = document.getElementById('newMemEmail').value.trim().toLowerCase();
+    const password = document.getElementById('newMemPassword').value;
+    
+    if(!name || !email || !password) return showToast('Please fill all fields', 'error');
+    if(!curProjId) return showToast('Select a project first', 'error');
+    
+    const users = JSON.parse(localStorage.getItem('meal_users')) || [];
+    if(users.find(u => u.email === email)) return showToast('Email already registered!', 'error');
+    
+    const uid = Date.now().toString() + Math.random().toString(36).substr(2, 5);
+    users.push({ id: uid, name, email, password, role: 'user' });
+    localStorage.setItem('meal_users', JSON.stringify(users));
+    
+    const enrolls = JSON.parse(localStorage.getItem('meal_enrollments')) || [];
+    enrolls.push({ projectId: curProjId, userId: uid, status: 'approved', moneyGiven: 0 });
+    localStorage.setItem('meal_enrollments', JSON.stringify(enrolls));
+    
+    showToast('Member added to database & project!');
+    document.getElementById('cancelNewMember').click();
+    refresh();
+  });
+
   // ─── Members & Approvals ───
   function loadMembers() {
     const enrolls = JSON.parse(localStorage.getItem('meal_enrollments')) || [];
@@ -172,6 +206,10 @@ function initAdminApp() {
         mBody.innerHTML += `<tr>
           <td>${u.name}</td><td>${u.email}</td>
           <td><span class="badge badge-green"><i class="fas fa-check-circle"></i> Active</span></td>
+          <td class="tc">
+            <button class="btn btn-warning btn-sm btn-rem-mem-global" data-id="${u.id}" title="Remove from Project"><i class="fas fa-user-minus"></i></button>
+            <button class="btn btn-danger btn-sm btn-del-user" data-id="${u.id}" title="Delete User Completely"><i class="fas fa-trash"></i></button>
+          </td>
         </tr>`;
       }
     });
@@ -185,6 +223,26 @@ function initAdminApp() {
         showToast('Member Approved!');
         refresh();
       }
+    }));
+
+    document.querySelectorAll('.btn-rem-mem-global').forEach(b => b.addEventListener('click', e => {
+      if(!confirm('Remove this member from the project?')) return;
+      const uid = e.currentTarget.dataset.id;
+      const nf = enrolls.filter(x => !(x.projectId === curProjId && x.userId === uid));
+      localStorage.setItem('meal_enrollments', JSON.stringify(nf));
+      showToast('Removed from project.');
+      refresh();
+    }));
+
+    document.querySelectorAll('.btn-del-user').forEach(b => b.addEventListener('click', e => {
+      if(!confirm('Delete this user COMPLETELY from the database? This cannot be undone!')) return;
+      const uid = e.currentTarget.dataset.id;
+      const nUsers = users.filter(x => x.id !== uid);
+      localStorage.setItem('meal_users', JSON.stringify(nUsers));
+      const nEnrolls = enrolls.filter(x => x.userId !== uid);
+      localStorage.setItem('meal_enrollments', JSON.stringify(nEnrolls));
+      showToast('User deleted from database.');
+      refresh();
     }));
   }
 

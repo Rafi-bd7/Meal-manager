@@ -162,6 +162,22 @@
 
       <!-- Tab: Members -->
       <div id="tab-members" class="tab-content glass-panel">
+        <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+          <h3 style="font-size:1.05rem; margin:0;"><i class="fas fa-users" style="color:var(--primary);"></i> Manage Members</h3>
+          <button id="addNewMemberBtn" class="btn btn-primary btn-sm"><i class="fas fa-user-plus"></i> Add New Member</button>
+        </div>
+
+        <div id="newMemberPanel" class="glass-panel mb-3 hidden fade-in" style="border-color:rgba(79,142,247,.4); padding: 1rem;">
+          <h3 style="font-size:1rem; margin-bottom:1rem;"><i class="fas fa-user-plus" style="color:var(--primary);"></i> Add Member to Database</h3>
+          <div class="flex gap-3 flex-wrap">
+            <input type="text" id="newMemName" class="form-control" placeholder="Name" style="flex:1; min-width:150px; padding:.5rem;">
+            <input type="email" id="newMemEmail" class="form-control" placeholder="Email" style="flex:1; min-width:150px; padding:.5rem;">
+            <input type="password" id="newMemPassword" class="form-control" placeholder="Password" style="flex:1; min-width:150px; padding:.5rem;">
+            <button id="confirmNewMember" class="btn btn-primary"><i class="fas fa-check"></i> Add</button>
+            <button id="cancelNewMember" class="btn btn-outline"><i class="fas fa-times"></i> Cancel</button>
+          </div>
+        </div>
+
         <h3 style="font-size:1rem; margin-bottom:1rem;"><i class="fas fa-user-clock" style="color:var(--warning);"></i> Enrollment Requests</h3>
         <div class="table-wrap mb-4">
           <table>
@@ -172,7 +188,7 @@
         <h3 style="font-size:1rem; margin-bottom:1rem;"><i class="fas fa-users" style="color:var(--accent);"></i> Active Members</h3>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Name</th><th>Email</th><th>Status</th></tr></thead>
+            <thead><tr><th>Name</th><th>Email</th><th>Status</th><th class="tc">Action</th></tr></thead>
             <tbody id="membersBody"></tbody>
           </table>
         </div>
