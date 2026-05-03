@@ -38,7 +38,7 @@ window.toggleMeal = function(type) {
   if(window.autoSaveMeal) window.autoSaveMeal();
 };
 
-document.addEventListener('DOMContentLoaded', () => {
+function initUserApp() {
   const cur = JSON.parse(localStorage.getItem('meal_currentUser'));
   if (!cur || cur.role !== 'user') {
     window.location.href = 'login.html';
@@ -272,4 +272,7 @@ document.addEventListener('DOMContentLoaded', () => {
       </tr>`;
     });
   }
-});
+}
+
+if (window.firebaseDataLoaded) initUserApp();
+else window.addEventListener('firebaseDataLoaded', initUserApp);

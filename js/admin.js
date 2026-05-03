@@ -23,7 +23,7 @@ function showToast(msg, type = 'success') {
   setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateX(110%)'; setTimeout(() => t.remove(), 300); }, 3000);
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+function initAdminApp() {
   const cur = JSON.parse(localStorage.getItem('meal_currentUser'));
   if (!cur || cur.role !== 'admin') {
     window.location.href = 'login.html';
@@ -448,4 +448,7 @@ document.addEventListener('DOMContentLoaded', () => {
       e.target.value = ''; // Reset input
     });
   }
-});
+}
+
+if (window.firebaseDataLoaded) initAdminApp();
+else window.addEventListener('firebaseDataLoaded', initAdminApp);

@@ -34,7 +34,7 @@ function initDB() {
   if (!localStorage.getItem('meal_comments'))    localStorage.setItem('meal_comments', JSON.stringify([]));
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+function initAuthApp() {
   initDB();
 
   // Redirect if already logged in
@@ -125,4 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
       e.target.value = '';
     });
   }
-});
+}
+
+if (window.firebaseDataLoaded) initAuthApp();
+else window.addEventListener('firebaseDataLoaded', initAuthApp);
