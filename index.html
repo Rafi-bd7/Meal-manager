@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MealManager — Smart Hostel Meal System</title>
+  <meta name="description" content="Automate hostel meal calculations, track daily meals, manage finances and generate PDF reports.">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+  <div class="bg-scene">
+    <div class="bg-orb bg-orb-1"></div>
+    <div class="bg-orb bg-orb-2"></div>
+    <div class="bg-orb bg-orb-3"></div>
+  </div>
+
+  <nav class="navbar">
+    <div class="nav-brand"><i class="fas fa-utensils"></i> MealManager</div>
+    <div class="nav-links">
+      <a href="#features" class="nav-item">Features</a>
+      <button class="theme-toggle" id="themeToggle" title="Toggle theme"></button>
+      <a href="login.html" class="btn btn-primary"><i class="fas fa-sign-in-alt"></i> Login</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <section class="hero">
+      <div class="hero-badge"><i class="fas fa-star"></i> v2.0 — Your hostel or Mess life, made completely hassle-free</div>
+      <h1>Smart <span class="highlight">Meal Management</span><br>For Hostels & Messes</h1>
+      <p>Automate monthly meal calculations. Admins manage menus and finances, users track meals and balances — all in real-time.</p>
+      <div class="hero-actions">
+        <a href="login.html" class="btn btn-primary" style="font-size:1rem; padding:.85rem 2rem;">
+          <i class="fas fa-rocket"></i> Get Started
+        </a>
+        <a href="#features" class="btn btn-outline" style="font-size:1rem; padding:.85rem 2rem;">
+          <i class="fas fa-info-circle"></i> Learn More
+        </a>
+      </div>
+    </section>
+
+    <section id="features">
+      <div class="features-grid">
+        <div class="feature-card card-3d">
+          <div class="feature-icon-wrap"><i class="fas fa-calculator"></i></div>
+          <h3>Auto Calculations</h3>
+          <p>Meal rate updates automatically as members add deposits. Individual costs calculated instantly.</p>
+        </div>
+        <div class="feature-card card-3d">
+          <div class="feature-icon-wrap"><i class="fas fa-calendar-check"></i></div>
+          <h3>Daily Tracking</h3>
+          <p>Track Breakfast, Lunch & Dinner per member per day. Admin sees a full overview table.</p>
+        </div>
+        <div class="feature-card card-3d">
+          <div class="feature-icon-wrap"><i class="fas fa-comments"></i></div>
+          <h3>Comment System</h3>
+          <p>Members can leave daily comments. Admin reviews all messages from the dashboard.</p>
+        </div>
+        <div class="feature-card card-3d">
+          <div class="feature-icon-wrap"><i class="fas fa-file-pdf"></i></div>
+          <h3>PDF Reports</h3>
+          <p>Generate complete monthly financial reports with one click. Share with all members.</p>
+        </div>
+        <div class="feature-card card-3d">
+          <div class="feature-icon-wrap"><i class="fas fa-moon"></i></div>
+          <h3>Night Mode</h3>
+          <p>Premium dark and light themes with smooth transitions and glassmorphism design.</p>
+        </div>
+        <div class="feature-card card-3d">
+          <div class="feature-icon-wrap"><i class="fas fa-chart-line"></i></div>
+          <h3>Live Meal Rate</h3>
+          <p>Meal rate updates day-by-day as meals and deposits increase throughout the month.</p>
+        </div>
+      </div>
+    </section>
+        <div class="contact-info-card card-3d">
+          <h3>Contact Info</h3>
+          <ul class="contact-list">
+            <li><i class="fas fa-envelope"></i> <span>redwanrafi8659@gmail.com</span></li>
+            <li><i class="fas fa-phone-alt"></i> <span>+8801940538340</span></li>
+            <li><i class="fas fa-map-marker-alt"></i> <span>Dhaka, Bangladesh</span></li>
+          </ul>
+
+          <div class="social-links">
+            <a href="https://www.facebook.com/share/1G6RgzX5yT/" target="_blank" class="social-icon facebook" title="Facebook">
+              <i class="fab fa-facebook-f"></i>
+            </a>
+            <a href="https://www.instagram.com/_cool_red_wine_?igsh=OXEzYzV1NWtzOGM3" target="_blank" class="social-icon instagram" title="Instagram">
+              <i class="fab fa-instagram"></i>
+            </a>
+            <a href="https://www.linkedin.com/in/red-rafi?utm_source=share_via&utm_content=profile&utm_medium=member_android" target="_blank" class="social-icon linkedin" title="LinkedIn">
+              <i class="fab fa-linkedin-in"></i>
+            </a>
+            <a href="https://github.com/Rafi-bd7" target="_blank" class="social-icon github" title="GitHub">
+              <i class="fab fa-github"></i>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="text-center mt-4" style="padding:2rem 0; border-top:1px solid var(--glass-border); color:var(--text-muted); font-size:0.85rem;">
+      <p>&copy; 2026 MealManager by RAFI. Designed for Meal Managers.</p>
+    </footer>
+  </div>
+  <script>
+    const toggle = document.getElementById('themeToggle');
+    const html = document.documentElement;
+    const saved = localStorage.getItem('mm_theme') || 'light';
+    html.setAttribute('data-theme', saved);
+    toggle.addEventListener('click', () => {
+      const t = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      html.setAttribute('data-theme', t);
+      localStorage.setItem('mm_theme', t);
+    });
+  </script>
+</body>
+</html>

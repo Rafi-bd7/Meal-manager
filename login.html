@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MealManager — Login & Register</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+  <div class="bg-scene">
+    <div class="bg-orb bg-orb-1"></div>
+    <div class="bg-orb bg-orb-2"></div>
+    <div class="bg-orb bg-orb-3"></div>
+  </div>
+  <div id="toast-container"></div>
+
+  <nav class="navbar">
+    <div class="nav-brand"><i class="fas fa-utensils"></i> MealManager</div>
+    <div class="nav-links">
+      <button class="theme-toggle" id="themeToggle" title="Toggle theme"></button>
+      <button id="restoreBtn" class="btn btn-outline btn-sm" title="Restore Data"><i class="fas fa-upload"></i> Restore</button>
+      <input type="file" id="restoreFile" accept=".json" style="display:none;">
+      <a href="index.html" class="btn btn-outline btn-sm"><i class="fas fa-home"></i> Home</a>
+    </div>
+  </nav>
+
+  <div class="auth-wrapper">
+    <div class="auth-card glass-panel fade-in">
+      <!-- Login -->
+      <div id="loginForm">
+        <div class="auth-logo">
+          <div class="auth-logo-icon"><i class="fas fa-utensils"></i></div>
+          <h2 style="font-size:1.6rem; font-weight:800; margin-bottom:0.25rem;">Welcome Back</h2>
+          <p class="text-muted" style="font-size:.9rem;">Sign in to your MealManager account</p>
+        </div>
+        <div class="form-group">
+          <label class="form-label"><i class="fas fa-envelope"></i> Email Address</label>
+          <input type="email" id="loginEmail" class="form-control" placeholder="you@gmail.com" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label"><i class="fas fa-lock"></i> Password</label>
+          <input type="password" id="loginPassword" class="form-control" placeholder="••••••••" required>
+        </div>
+        <button id="loginBtn" class="btn btn-primary btn-block mt-2"><i class="fas fa-sign-in-alt"></i> Sign In</button>
+        <p class="text-center mt-3" style="font-size:.88rem; color:var(--text-muted);">
+          No account? <a href="#" id="showReg" style="color:var(--primary); font-weight:600;">Register here</a>
+        </p>
+      </div>
+
+      <!-- Register -->
+      <div id="registerForm" class="hidden">
+        <div class="auth-logo">
+          <div class="auth-logo-icon"><i class="fas fa-user-plus"></i></div>
+          <h2 style="font-size:1.6rem; font-weight:800; margin-bottom:0.25rem;">Create Account</h2>
+          <p class="text-muted" style="font-size:.9rem;">Join MealManager today</p>
+        </div>
+        <div class="form-group">
+          <label class="form-label"><i class="fas fa-user"></i> Full Name</label>
+          <input type="text" id="regName" class="form-control" placeholder="Your full name" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label"><i class="fas fa-envelope"></i> Email Address</label>
+          <input type="email" id="regEmail" class="form-control" placeholder="you@gmail.com" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label"><i class="fas fa-lock"></i> Password</label>
+          <input type="password" id="regPassword" class="form-control" placeholder="••••••••" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label"><i class="fas fa-user-tag"></i> Role</label>
+          <select id="regRole" class="form-control">
+            <option value="user">User (Member)</option>
+            <option value="admin">Admin (Manager)</option>
+          </select>
+        </div>
+        <button id="regBtn" class="btn btn-primary btn-block mt-2"><i class="fas fa-user-check"></i> Create Account</button>
+        <p class="text-center mt-3" style="font-size:.88rem; color:var(--text-muted);">
+          Have account? <a href="#" id="showLogin" style="color:var(--primary); font-weight:600;">Sign in here</a>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/auth.js"></script>
+</body>
+</html>

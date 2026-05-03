@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Dashboard — MealManager</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+  <div class="bg-scene">
+    <div class="bg-orb bg-orb-1"></div>
+    <div class="bg-orb bg-orb-2"></div>
+    <div class="bg-orb bg-orb-3"></div>
+  </div>
+  <div id="toast-container"></div>
+
+  <nav class="navbar">
+    <div class="nav-brand"><i class="fas fa-utensils"></i> MealManager</div>
+    <div class="nav-links">
+      <span id="userNameDisplay" style="font-size:.9rem; font-weight:600; color:var(--text-muted);"></span>
+      <button class="theme-toggle" id="themeToggle" title="Toggle theme"></button>
+      <button id="logoutBtn" class="btn btn-outline btn-sm"><i class="fas fa-sign-out-alt"></i> Logout</button>
+    </div>
+  </nav>
+
+  <div class="container">
+    <!-- Join Project -->
+    <div id="joinSection" class="glass-panel fade-in" style="max-width:560px; margin:3rem auto; text-align:center;">
+      <div style="font-size:3rem; margin-bottom:1rem;">🍽️</div>
+      <h2 style="font-weight:800; margin-bottom:.5rem;">Join a Project</h2>
+      <p class="text-muted mb-3">Select a mess/month project and send a join request to the admin.</p>
+      <div class="flex gap-2 justify-center flex-wrap">
+        <select id="projectsSelect" class="form-control" style="width:220px; text-align:left;">
+          <option value="">— Select Project —</option>
+        </select>
+        <button id="joinBtn" class="btn btn-primary"><i class="fas fa-paper-plane"></i> Request</button>
+      </div>
+      <div id="joinStatus" class="mt-3"></div>
+    </div>
+
+    <!-- Workspace -->
+    <div id="userWorkspace" class="hidden fade-in">
+      <!-- Header -->
+      <div class="glass-panel mb-3 flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 id="projectTitle" class="text-gradient" style="font-size:1.2rem; font-weight:800; margin:0;"></h2>
+          <p class="text-muted" style="font-size:.8rem; margin-top:.2rem;">Your enrolled project</p>
+        </div>
+        <div class="flex gap-2 flex-wrap">
+          <div class="badge badge-blue"><i class="fas fa-chart-line"></i> Rate: <span id="showMealRate">0.00 ৳</span></div>
+          <div class="badge badge-purple"><i class="fas fa-coins"></i> Pool: <span id="showTotalMoney">0 ৳</span></div>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="grid-3 mb-3">
+        <div class="stat-card card-3d">
+          <div class="stat-label"><i class="fas fa-hamburger"></i> My Total Meals</div>
+          <div class="stat-value" id="myTotalMeals">0</div>
+          <i class="fas fa-utensils stat-icon"></i>
+        </div>
+        <div class="stat-card card-3d">
+          <div class="stat-label"><i class="fas fa-hand-holding-usd"></i> My Deposit</div>
+          <div class="stat-value" id="myDeposit">0 ৳</div>
+          <i class="fas fa-wallet stat-icon"></i>
+        </div>
+        <div class="stat-card card-3d" id="balanceCard">
+          <div class="stat-label"><i class="fas fa-balance-scale"></i> Balance</div>
+          <div class="stat-value" id="myBalance">0.00 ৳</div>
+          <i class="fas fa-calculator stat-icon"></i>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="meals"><i class="fas fa-calendar-check"></i> Daily Meals</button>
+        <button class="tab-btn" data-tab="comments"><i class="fas fa-comment-alt"></i> My Comments</button>
+        <button class="tab-btn" data-tab="menu"><i class="fas fa-list"></i> Weekly Menu</button>
+      </div>
+
+      <!-- Tab: Daily Meals -->
+      <div id="tab-meals" class="tab-content glass-panel">
+        <div class="flex items-center justify-between flex-wrap gap-3 mb-3">
+          <h3 style="font-size:1.05rem; margin:0;"><i class="fas fa-clock" style="color:var(--primary);"></i> Select your meals</h3>
+          <input type="date" id="mealDate" class="form-control" style="width:auto; padding:.5rem .85rem;">
+        </div>
+
+        <div class="meal-toggle-grid">
+          <div class="meal-toggle-card" id="cardBreakfast" onclick="toggleMeal('breakfast')">
+            <div class="meal-check-indicator" id="chkBreakfast"><i class="fas fa-check"></i></div>
+            <div class="meal-icon">🌅</div>
+            <div class="meal-name">Breakfast</div>
+            <div class="meal-time">6:00 AM – 9:00 AM</div>
+          </div>
+          <div class="meal-toggle-card" id="cardLunch" onclick="toggleMeal('lunch')">
+            <div class="meal-check-indicator" id="chkLunch"><i class="fas fa-check"></i></div>
+            <div class="meal-icon">☀️</div>
+            <div class="meal-name">Lunch</div>
+            <div class="meal-time">12:00 PM – 2:00 PM</div>
+          </div>
+          <div class="meal-toggle-card" id="cardDinner" onclick="toggleMeal('dinner')">
+            <div class="meal-check-indicator" id="chkDinner"><i class="fas fa-check"></i></div>
+            <div class="meal-icon">🌙</div>
+            <div class="meal-name">Dinner</div>
+            <div class="meal-time">7:00 PM – 9:30 PM</div>
+          </div>
+        </div>
+
+        <div class="text-center">
+          <button id="saveMealBtn" class="btn btn-primary" style="padding:.8rem 2.5rem;">
+            <i class="fas fa-save"></i> Save Meal Selection
+          </button>
+          <p class="text-muted mt-1" style="font-size:.8rem;">Selections are saved and instantly visible to admin.</p>
+        </div>
+      </div>
+
+      <!-- Tab: Comments -->
+      <div id="tab-comments" class="tab-content glass-panel">
+        <h3 style="font-size:1.05rem; margin-bottom:1.25rem;"><i class="fas fa-comment-dots" style="color:var(--primary);"></i> My Comments</h3>
+        <div id="myCommentsContainer" class="mb-3">
+          <p class="text-muted text-center">No comments yet.</p>
+        </div>
+        <div class="comment-input-area">
+          <input type="text" id="commentInput" class="form-control" placeholder="Write a comment to admin..." maxlength="300">
+          <button id="sendCommentBtn" class="btn btn-primary btn-sm"><i class="fas fa-paper-plane"></i> Send</button>
+        </div>
+      </div>
+
+      <!-- Tab: Menu -->
+      <div id="tab-menu" class="tab-content glass-panel">
+        <h3 style="font-size:1.05rem; margin-bottom:1.25rem;"><i class="fas fa-clipboard-list" style="color:var(--primary);"></i> Weekly Food Menu</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Day</th><th>🌅 Breakfast</th><th>☀️ Lunch</th><th>🌙 Dinner</th></tr></thead>
+            <tbody id="menuBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/user.js"></script>
+</body>
+</html>
