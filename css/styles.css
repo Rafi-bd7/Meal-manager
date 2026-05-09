@@ -575,26 +575,62 @@ a { text-decoration:none; color:inherit; }
 }
 
 /* ─── Floating Chat Widget ─── */
+@keyframes pulseGlow {
+  0% { box-shadow: 0 0 0 0 rgba(79, 142, 247, 0.7); }
+  70% { box-shadow: 0 0 0 15px rgba(79, 142, 247, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(79, 142, 247, 0); }
+}
+
+#chatLauncher {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  width: 65px;
+  height: 65px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  color: white;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+  cursor: pointer;
+  z-index: 99999;
+  transition: transform 0.2s, box-shadow 0.2s;
+  animation: pulseGlow 2s infinite;
+}
+#chatLauncher:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+}
+#chatLauncher.hidden {
+  display: none !important;
+}
+
 #chatWidget {
   position: fixed;
-  bottom: 20px;
-  right: 20px;
+  bottom: 110px;
+  right: 30px;
   width: 320px;
   background: var(--glass);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--glass-border);
-  border-radius: 12px;
+  border-radius: 20px;
   box-shadow: 0 8px 32px rgba(0,0,0,0.3);
-  z-index: 9999;
+  z-index: 99999;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   height: 420px; /* Default open height */
+  transform-origin: bottom right;
 }
-#chatWidget.minimized {
-  height: 46px; /* Only header visible */
+#chatWidget.closed {
+  transform: scale(0);
+  opacity: 0;
+  pointer-events: none;
 }
 #chatWidget.hidden {
   display: none !important;
@@ -602,13 +638,14 @@ a { text-decoration:none; color:inherit; }
 #chatHeader {
   background: linear-gradient(135deg, var(--primary), var(--secondary));
   color: #fff;
-  padding: 12px 15px;
+  padding: 15px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   font-weight: 600;
   cursor: grab; /* For dragging */
   user-select: none;
+  font-size: 1.1rem;
 }
 #chatHeader:active {
   cursor: grabbing;
@@ -626,10 +663,10 @@ a { text-decoration:none; color:inherit; }
   background: rgba(255,255,255,0.4);
 }
 .chat-msg {
-  max-width: 80%;
-  padding: 8px 12px;
-  border-radius: 12px;
-  font-size: 0.9rem;
+  max-width: 85%;
+  padding: 10px 14px;
+  border-radius: 16px;
+  font-size: 0.95rem;
   line-height: 1.4;
   position: relative;
   word-wrap: break-word;

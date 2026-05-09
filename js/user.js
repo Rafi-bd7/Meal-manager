@@ -136,8 +136,10 @@ function initUserApp() {
   const mdInp = document.getElementById('mealDate');
   if(mdInp) { mdInp.value = localDate; mdInp.addEventListener('change', loadMeals); }
 
-  initUser();
+  // initChat MUST be called before initUser() so the 'refreshChat'
+  // event listener is ready when initUser() fires it after setting curProj.
   if (window.initChat) window.initChat(cur, () => curProj ? curProj.id : null);
+  initUser();
 
   document.getElementById('joinBtn')?.addEventListener('click', () => {
     const pid = document.getElementById('projectsSelect').value;

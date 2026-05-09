@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>My Dashboard — MealManager</title>
-  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/styles.css?v=4">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
@@ -161,8 +161,229 @@
     </div>
   </div>
 
-  <script type="module" src="js/firebase-sync.js"></script>
-  <script src="js/chat.js"></script>
-  <script src="js/user.js"></script>
+  <script type="module" src="js/firebase-sync.js?v=5"></script>
+  <script src="js/user.js?v=5"></script>
+
+  <!-- ═══ INLINE GROUP CHAT — no external file dependency ═══ -->
+  <style>
+    @keyframes fabPulse {
+      0%   { box-shadow: 0 0 0 0   rgba(99,102,241,.7); }
+      70%  { box-shadow: 0 0 0 14px rgba(99,102,241,0); }
+      100% { box-shadow: 0 0 0 0   rgba(99,102,241,0); }
+    }
+    #uc-fab {
+      position:fixed; bottom:28px; right:28px;
+      width:62px; height:62px; border-radius:50%;
+      background:linear-gradient(135deg,#6366f1,#8b5cf6);
+      color:#fff; font-size:1.7rem; border:none; outline:none;
+      display:none; align-items:center; justify-content:center;
+      cursor:pointer; z-index:99998;
+      box-shadow:0 4px 18px rgba(0,0,0,.4);
+      animation:fabPulse 2s infinite;
+      transition:transform .2s;
+    }
+    #uc-fab:hover { transform:scale(1.1); }
+    #uc-box {
+      position:fixed; bottom:104px; right:28px;
+      width:310px; height:430px;
+      background:rgba(15,15,35,.93);
+      backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px);
+      border:1px solid rgba(255,255,255,.15); border-radius:20px;
+      box-shadow:0 10px 40px rgba(0,0,0,.5);
+      display:none; flex-direction:column; overflow:hidden;
+      z-index:99999;
+      transform-origin:bottom right;
+      transition:transform .25s cubic-bezier(.4,0,.2,1),opacity .25s;
+    }
+    #uc-box.open { display:flex; }
+    #uc-head {
+      background:linear-gradient(135deg,#6366f1,#8b5cf6);
+      padding:13px 16px; display:flex;
+      justify-content:space-between; align-items:center;
+      font-weight:700; font-size:1rem; color:#fff;
+      cursor:grab; user-select:none; flex-shrink:0;
+    }
+    #uc-head:active { cursor:grabbing; }
+    #uc-close {
+      background:rgba(255,255,255,.22); border:none; color:#fff;
+      width:28px; height:28px; border-radius:50%; cursor:pointer;
+      font-size:.9rem; display:flex; align-items:center; justify-content:center;
+    }
+    #uc-msgs {
+      flex:1; overflow-y:auto; padding:12px;
+      display:flex; flex-direction:column; gap:8px;
+    }
+    #uc-msgs::-webkit-scrollbar { width:4px; }
+    #uc-msgs::-webkit-scrollbar-thumb { background:rgba(255,255,255,.2); border-radius:4px; }
+    .ucm { max-width:82%; padding:9px 13px; border-radius:14px;
+           font-size:.88rem; line-height:1.45; word-break:break-word; }
+    .ucm.me  { align-self:flex-end;  background:#6366f1; color:#fff; border-bottom-right-radius:3px; }
+    .ucm.you { align-self:flex-start; background:rgba(255,255,255,.12);
+               color:#e2e8f0; border-bottom-left-radius:3px; }
+    .ucm .ucm-name { font-size:.7rem; color:#a5b4fc; font-weight:700; margin-bottom:3px; }
+    .ucm .ucm-time { font-size:.65rem; opacity:.55; margin-top:4px; text-align:right; }
+    #uc-footer {
+      padding:10px 12px; display:flex; gap:8px; flex-shrink:0;
+      border-top:1px solid rgba(255,255,255,.1);
+      background:rgba(255,255,255,.04);
+    }
+    #uc-inp {
+      flex:1; background:rgba(255,255,255,.1);
+      border:1px solid rgba(255,255,255,.2); border-radius:20px;
+      padding:8px 14px; color:#fff; font-size:.88rem; outline:none;
+    }
+    #uc-inp::placeholder { color:rgba(255,255,255,.4); }
+    #uc-send {
+      width:38px; height:38px; border-radius:50%;
+      background:#6366f1; border:none; color:#fff;
+      display:flex; align-items:center; justify-content:center;
+      cursor:pointer; font-size:.9rem; transition:transform .2s;
+    }
+    #uc-send:hover { transform:scale(1.1); }
+  </style>
+
+  <button id="uc-fab" title="Group Chat"><i class="fas fa-comment-dots"></i></button>
+  <div id="uc-box">
+    <div id="uc-head">
+      <span><i class="fas fa-comments"></i>&nbsp; Group Chat</span>
+      <button id="uc-close"><i class="fas fa-times"></i></button>
+    </div>
+    <div id="uc-msgs"></div>
+    <div id="uc-footer">
+      <input id="uc-inp" type="text" placeholder="Type a message…" autocomplete="off">
+      <button id="uc-send"><i class="fas fa-paper-plane"></i></button>
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    var fab    = document.getElementById('uc-fab');
+    var box    = document.getElementById('uc-box');
+    var head   = document.getElementById('uc-head');
+    var close  = document.getElementById('uc-close');
+    var msgs   = document.getElementById('uc-msgs');
+    var inp    = document.getElementById('uc-inp');
+    var send   = document.getElementById('uc-send');
+    var isOpen = false;
+
+    // Open / Close
+    fab.addEventListener('click', function () {
+      isOpen = true;
+      box.classList.add('open');
+      fab.style.display = 'none';
+      msgs.scrollTop = msgs.scrollHeight;
+    });
+    close.addEventListener('click', function () {
+      isOpen = false;
+      box.classList.remove('open');
+      fab.style.display = 'flex';
+    });
+
+    // Drag
+    var dragging = false, ox = 0, oy = 0, ix, iy;
+    head.addEventListener('mousedown', function (e) {
+      if (e.target === close || e.target.closest('#uc-close')) return;
+      dragging = true; ix = e.clientX - ox; iy = e.clientY - oy;
+    });
+    document.addEventListener('mouseup', function () { dragging = false; });
+    document.addEventListener('mousemove', function (e) {
+      if (!dragging) return;
+      ox = e.clientX - ix; oy = e.clientY - iy;
+      box.style.transform = 'translate3d(' + ox + 'px,' + oy + 'px,0)';
+    });
+
+    // Get current user and project from localStorage
+    function getCtx() {
+      var user = JSON.parse(localStorage.getItem('meal_currentUser') || 'null');
+      if (!user) return null;
+      var enrolls  = JSON.parse(localStorage.getItem('meal_enrollments') || '[]');
+      var projects = JSON.parse(localStorage.getItem('meal_projects')    || '[]');
+      var enroll   = enrolls.find(function (e) {
+        return e.userId === user.id && e.status === 'approved';
+      });
+      if (!enroll) return null;
+      var proj = projects.find(function (p) { return p.id === enroll.projectId; });
+      if (!proj) return null;
+      return { user: user, projId: proj.id };
+    }
+
+    // Render messages
+    var lastHtml = '';
+    function render() {
+      var ctx = getCtx();
+      if (!ctx) {
+        fab.style.display = 'none';
+        return;
+      }
+      fab.style.display = 'flex';
+      var chats = JSON.parse(localStorage.getItem('meal_chats') || '[]');
+      var mine  = chats
+        .filter(function (c) { return c.projectId === ctx.projId; })
+        .sort(function (a, b) { return a.time - b.time; });
+
+      var html = mine.map(function (c) {
+        var self = c.userId === ctx.user.id;
+        var t = new Date(c.time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+        return '<div class="ucm ' + (self ? 'me' : 'you') + '">' +
+          (!self ? '<div class="ucm-name">' + c.userName + '</div>' : '') +
+          '<div>' + c.text + '</div>' +
+          '<div class="ucm-time">' + t + '</div></div>';
+      }).join('');
+
+      if (html !== lastHtml) {
+        var atBottom = msgs.scrollHeight - msgs.clientHeight <= msgs.scrollTop + 30;
+        msgs.innerHTML = html;
+        if (atBottom || lastHtml === '') msgs.scrollTop = msgs.scrollHeight;
+        lastHtml = html;
+      }
+    }
+
+    // Send message
+    function sendMsg() {
+      var ctx = getCtx();
+      if (!ctx) return;
+      var text = inp.value.trim();
+      if (!text) return;
+      var chats = JSON.parse(localStorage.getItem('meal_chats') || '[]');
+      var msg = {
+        id: Date.now().toString() + Math.random().toString(36).slice(2, 6),
+        projectId: ctx.projId,
+        userId: ctx.user.id,
+        userName: ctx.user.name,
+        text: text,
+        time: Date.now()
+      };
+      chats.push(msg);
+      localStorage.setItem('meal_chats', JSON.stringify(chats));
+      if (window.fbCreate) window.fbCreate('meal_chats', msg.id, msg);
+      inp.value = '';
+      render();
+      setTimeout(function () { msgs.scrollTop = msgs.scrollHeight; }, 50);
+    }
+
+    send.addEventListener('click', sendMsg);
+    inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') sendMsg(); });
+
+    // firebase-sync.js is a MODULE (deferred) — it always runs AFTER inline scripts.
+    // So firebaseDataLoaded will always fire AFTER this script loads.
+    // We listen for it and also keep a polling interval as safety net.
+    window.addEventListener('firebaseDataLoaded', function () {
+      render();
+    });
+
+    // Also listen to synthetic storage events fired by firebase-sync.js
+    window.addEventListener('storage', function (e) {
+      if (!e.key || e.key === 'meal_chats' || e.key === 'meal_enrollments' || e.key === 'meal_projects') {
+        render();
+      }
+    });
+
+    // Polling fallback — runs every 2s regardless of events
+    setInterval(render, 2000);
+
+    // Initial render (will be empty until Firebase loads, that's ok)
+    render();
+  })();
+  </script>
 </body>
 </html>
