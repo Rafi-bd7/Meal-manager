@@ -37,7 +37,8 @@ function initAdminApp() {
 
   // Sync state between tabs (including file:// protocol fallback)
   window.addEventListener('storage', e => {
-    if(!e.key || ['meal_records','meal_enrollments','meal_projects','meal_comments'].includes(e.key)) refresh();
+    if (!e.key || e.key === 'meal_projects') loadProjects();
+    if (!e.key || ['meal_records','meal_enrollments','meal_projects','meal_comments'].includes(e.key)) refresh();
   });
 
   // Fallback for real-time sync on local files (file://) where storage events fail
@@ -66,18 +67,22 @@ function initAdminApp() {
 
   function loadProjects() {
     const projects = JSON.parse(localStorage.getItem('meal_projects')) || [];
-    const myProjects = projects.filter(p => p.adminId === cur.id);
+    const myProjects = projects.filter(p => p.adminId === cur.id || !p.adminId);
     const sel = document.getElementById('projectSelect');
-    sel.innerHTML = '<option value="">— Select Month —</option>';
     
+    // Remember current selection
+    const currentVal = sel.value;
+    
+    sel.innerHTML = '<option value="">— Select Month —</option>';
     myProjects.forEach(p => sel.innerHTML += `<option value="${p.id}">${p.name}</option>`);
     
     // Auto-select logic
-    if (!curProjId && myProjects.length > 0) {
+    if (currentVal && myProjects.find(p => p.id === currentVal)) {
+      sel.value = currentVal;
+    } else if (!curProjId && myProjects.length > 0) {
       curProjId = myProjects[myProjects.length - 1].id;
-    }
-    
-    if (curProjId && myProjects.find(p => p.id === curProjId)) {
+      sel.value = curProjId;
+    } else if (curProjId && myProjects.find(p => p.id === curProjId)) {
       sel.value = curProjId;
     } else {
       curProjId = '';
@@ -97,7 +102,13 @@ function initAdminApp() {
   document.getElementById('confirmNewProject').addEventListener('click', () => {
     const name = document.getElementById('newProjectName').value.trim();
     if(!name) return showToast('Enter project name', 'error');
+    
     const projects = JSON.parse(localStorage.getItem('meal_projects')) || [];
+    
+    if (projects.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+      return showToast('Project with this name already exists!', 'error');
+    }
+
     const days = ['Saturday','Sunday','Monday','Tuesday','Wednesday','Thursday','Friday'];
     const menu = {}; days.forEach(d => menu[d] = {b:'', l:'', d:''});
     
@@ -118,6 +129,51 @@ function initAdminApp() {
     document.getElementById('projectSelect').dispatchEvent(new Event('change'));
   });
 
+  // Delete Project
+  document.getElementById('delProjectBtn')?.addEventListener('click', () => {
+    if (!curProjId) return;
+    if (!confirm('Are you sure you want to completely delete this project? This will remove all meals, deposits, and members associated with this project. This action CANNOT be undone!')) return;
+    
+    // Delete project
+    let projects = JSON.parse(localStorage.getItem('meal_projects')) || [];
+    projects = projects.filter(p => p.id !== curProjId);
+    localStorage.setItem('meal_projects', JSON.stringify(projects));
+    if (window.fbDelete) window.fbDelete('meal_projects', curProjId);
+    
+    // Delete enrollments
+    let enrolls = JSON.parse(localStorage.getItem('meal_enrollments')) || [];
+    const enrollsToDelete = enrolls.filter(e => e.projectId === curProjId);
+    enrolls = enrolls.filter(e => e.projectId !== curProjId);
+    localStorage.setItem('meal_enrollments', JSON.stringify(enrolls));
+    enrollsToDelete.forEach(e => {
+        if (window.fbDelete) window.fbDelete('meal_enrollments', `${curProjId}_${e.userId}`);
+    });
+
+    // Delete records
+    let records = JSON.parse(localStorage.getItem('meal_records')) || [];
+    const recordsToDelete = records.filter(r => r.projectId === curProjId);
+    records = records.filter(r => r.projectId !== curProjId);
+    localStorage.setItem('meal_records', JSON.stringify(records));
+    recordsToDelete.forEach(r => {
+        if (window.fbDelete) window.fbDelete('meal_records', `${curProjId}_${r.userId}_${r.date}`);
+    });
+
+    // Delete comments
+    let comments = JSON.parse(localStorage.getItem('meal_comments')) || [];
+    const commentsToDelete = comments.filter(c => c.projectId === curProjId);
+    comments = comments.filter(c => c.projectId !== curProjId);
+    localStorage.setItem('meal_comments', JSON.stringify(comments));
+    commentsToDelete.forEach(c => {
+        if (window.fbDelete) window.fbDelete('meal_comments', c.id);
+    });
+
+    showToast('Project deleted permanently.');
+    curProjId = '';
+    localStorage.removeItem('meal_adminLastProj');
+    loadProjects();
+    document.getElementById('projectSelect').dispatchEvent(new Event('change'));
+  });
+
   // Project Selection Change
   document.getElementById('projectSelect').addEventListener('change', e => {
     curProjId = e.target.value;
@@ -126,12 +182,14 @@ function initAdminApp() {
     if (curProjId) {
       document.getElementById('workspace').classList.remove('hidden');
       document.getElementById('exportPdfBtn').classList.remove('hidden');
+      document.getElementById('delProjectBtn')?.classList.remove('hidden');
       document.getElementById('pdfTitle').innerHTML = `<i class="fas fa-file-invoice" style="color:var(--primary);"></i> ${e.target.options[e.target.selectedIndex].text}`;
       loadMenu();
       refresh();
     } else {
       document.getElementById('workspace').classList.add('hidden');
       document.getElementById('exportPdfBtn').classList.add('hidden');
+      document.getElementById('delProjectBtn')?.classList.add('hidden');
     }
   });
 
@@ -152,6 +210,7 @@ function initAdminApp() {
     calculateFinances();
     loadTracker();
     loadComments();
+    loadProfiles();
   }
 
   // ─── Add New Member ───
@@ -293,12 +352,39 @@ function initAdminApp() {
 
       tBody.innerHTML += `<tr>
         <td><strong>${u.name}</strong></td>
-        <td class="tc">${r.breakfast ? y : n}</td>
-        <td class="tc">${r.lunch ? y : n}</td>
-        <td class="tc">${r.dinner ? y : n}</td>
+        <td class="tc admin-meal-toggle" style="cursor:pointer;" data-uid="${u.id}" data-type="breakfast" title="Click to toggle meal">${r.breakfast ? y : n}</td>
+        <td class="tc admin-meal-toggle" style="cursor:pointer;" data-uid="${u.id}" data-type="lunch" title="Click to toggle meal">${r.lunch ? y : n}</td>
+        <td class="tc admin-meal-toggle" style="cursor:pointer;" data-uid="${u.id}" data-type="dinner" title="Click to toggle meal">${r.dinner ? y : n}</td>
         <td class="tc"><span class="meal-count-pill">${tToday}</span></td>
         <td class="tc font-bold text-gradient">${tMonth}</td>
       </tr>`;
+    });
+
+    document.querySelectorAll('.admin-meal-toggle').forEach(el => {
+      el.addEventListener('click', e => {
+        const uid = e.currentTarget.dataset.uid;
+        const type = e.currentTarget.dataset.type;
+        
+        let records = JSON.parse(localStorage.getItem('meal_records')) || [];
+        const idx = records.findIndex(x => x.projectId === curProjId && x.userId === uid && x.date === dStr);
+        
+        let rObj;
+        if(idx > -1) {
+          rObj = records[idx];
+          rObj[type] = !rObj[type];
+          records[idx] = rObj;
+        } else {
+          rObj = { projectId: curProjId, userId: uid, date: dStr, breakfast: false, lunch: false, dinner: false };
+          rObj[type] = true;
+          records.push(rObj);
+        }
+        localStorage.setItem('meal_records', JSON.stringify(records));
+        if (window.fbCreate) window.fbCreate('meal_records', `${curProjId}_${uid}_${dStr}`, rObj);
+        
+        const u = users.find(x => x.id === uid);
+        showToast(`Meal updated for ${u ? u.name : 'User'}!`);
+        refresh();
+      });
     });
   }
 
@@ -523,6 +609,69 @@ function initAdminApp() {
       };
       reader.readAsText(file);
       e.target.value = ''; // Reset input
+    });
+  }
+
+  // ─── Profiles ───
+  document.getElementById('uploadPicBtn')?.addEventListener('click', () => document.getElementById('profilePicInput').click());
+  document.getElementById('profilePicInput')?.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 150;
+        const scaleSize = MAX_WIDTH / img.width;
+        canvas.width = MAX_WIDTH;
+        canvas.height = img.height * scaleSize;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        
+        const users = JSON.parse(localStorage.getItem('meal_users')) || [];
+        const idx = users.findIndex(u => u.id === cur.id);
+        if(idx > -1) {
+          users[idx].photo = dataUrl;
+          localStorage.setItem('meal_users', JSON.stringify(users));
+          if(window.fbUpdate) window.fbUpdate('meal_users', cur.id, { photo: dataUrl });
+          showToast('Profile picture updated!');
+          loadProfiles();
+        }
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  function loadProfiles() {
+    if(!curProjId) return;
+    const enrolls = JSON.parse(localStorage.getItem('meal_enrollments')) || [];
+    const users = JSON.parse(localStorage.getItem('meal_users')) || [];
+    const mems = enrolls.filter(e => e.projectId === curProjId && e.status === 'approved');
+    
+    const pb = document.getElementById('profilesBody');
+    if(pb) pb.innerHTML = '';
+    
+    // Update my profile pic display
+    const me = users.find(u => u.id === cur.id);
+    const myPic = document.getElementById('myProfilePic');
+    if(myPic && me) {
+      if(me.photo) myPic.innerHTML = `<img src="${me.photo}" style="width:100%; height:100%; object-fit:cover;">`;
+      else myPic.innerHTML = me.name.charAt(0).toUpperCase();
+    }
+
+    mems.forEach(en => {
+      const u = users.find(x => x.id === en.userId);
+      if(!u) return;
+      const photoHtml = u.photo ? `<img src="${u.photo}" style="width:40px; height:40px; border-radius:50%; object-fit:cover;">` : `<div style="width:40px; height:40px; border-radius:50%; background:var(--primary); display:flex; align-items:center; justify-content:center;">${u.name.charAt(0).toUpperCase()}</div>`;
+      if(pb) pb.innerHTML += `<tr>
+        <td>${photoHtml}</td>
+        <td><strong>${u.name}</strong></td>
+        <td>${u.email}</td>
+        <td>${u.password}</td>
+      </tr>`;
     });
   }
 }

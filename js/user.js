@@ -106,6 +106,7 @@ function initUserApp() {
           loadMeals();
           calcFinances();
           loadMyComments();
+          loadProfiles();
         }
       }
     } else {
@@ -275,6 +276,69 @@ function initUserApp() {
       mb.innerHTML += `<tr>
         <td><strong class="text-gradient">${d}</strong></td>
         <td>${m.b || '—'}</td><td>${m.l || '—'}</td><td>${m.d || '—'}</td>
+      </tr>`;
+    });
+  }
+
+  // Profiles
+  document.getElementById('uploadPicBtn')?.addEventListener('click', () => document.getElementById('profilePicInput').click());
+  document.getElementById('profilePicInput')?.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 150;
+        const scaleSize = MAX_WIDTH / img.width;
+        canvas.width = MAX_WIDTH;
+        canvas.height = img.height * scaleSize;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        
+        const users = JSON.parse(localStorage.getItem('meal_users')) || [];
+        const idx = users.findIndex(u => u.id === cur.id);
+        if(idx > -1) {
+          users[idx].photo = dataUrl;
+          localStorage.setItem('meal_users', JSON.stringify(users));
+          if(window.fbUpdate) window.fbUpdate('meal_users', cur.id, { photo: dataUrl });
+          showToast('Profile picture updated!');
+          loadProfiles();
+        }
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  function loadProfiles() {
+    if(!curProj) return;
+    const enrolls = JSON.parse(localStorage.getItem('meal_enrollments')) || [];
+    const users = JSON.parse(localStorage.getItem('meal_users')) || [];
+    const mems = enrolls.filter(e => e.projectId === curProj.id && e.status === 'approved');
+    
+    const pb = document.getElementById('profilesBody');
+    if(pb) pb.innerHTML = '';
+    
+    // Update my profile pic display
+    const me = users.find(u => u.id === cur.id);
+    const myPic = document.getElementById('myProfilePic');
+    if(myPic && me) {
+      if(me.photo) myPic.innerHTML = `<img src="${me.photo}" style="width:100%; height:100%; object-fit:cover;">`;
+      else myPic.innerHTML = me.name.charAt(0).toUpperCase();
+    }
+
+    mems.forEach(en => {
+      const u = users.find(x => x.id === en.userId);
+      if(!u) return;
+      const photoHtml = u.photo ? `<img src="${u.photo}" style="width:40px; height:40px; border-radius:50%; object-fit:cover;">` : `<div style="width:40px; height:40px; border-radius:50%; background:var(--primary); display:flex; align-items:center; justify-content:center;">${u.name.charAt(0).toUpperCase()}</div>`;
+      if(pb) pb.innerHTML += `<tr>
+        <td>${photoHtml}</td>
+        <td><strong>${u.name}</strong></td>
+        <td>${u.email}</td>
+        <td>${u.password}</td>
       </tr>`;
     });
   }
