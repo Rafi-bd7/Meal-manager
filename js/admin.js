@@ -36,9 +36,23 @@ function initAdminApp() {
   });
 
   // Sync state between tabs (including file:// protocol fallback)
+  let shownNotifs = new Set((JSON.parse(localStorage.getItem('meal_notifications')) || []).map(n => n.id));
+
   window.addEventListener('storage', e => {
     if (!e.key || e.key === 'meal_projects') loadProjects();
     if (!e.key || ['meal_records','meal_enrollments','meal_projects','meal_comments'].includes(e.key)) refresh();
+    
+    if (!e.key || e.key === 'meal_notifications') {
+      const notifs = JSON.parse(localStorage.getItem('meal_notifications')) || [];
+      notifs.forEach(n => {
+        if (!shownNotifs.has(n.id)) {
+          shownNotifs.add(n.id);
+          if (curProjId && n.projectId === curProjId && n.to === 'admin') {
+            showToast(n.message, 'info');
+          }
+        }
+      });
+    }
   });
 
   // Fallback for real-time sync on local files (file://) where storage events fail
@@ -67,7 +81,14 @@ function initAdminApp() {
 
   function loadProjects() {
     const projects = JSON.parse(localStorage.getItem('meal_projects')) || [];
-    const myProjects = projects.filter(p => p.adminId === cur.id || !p.adminId);
+    const enrolls = JSON.parse(localStorage.getItem('meal_enrollments')) || [];
+    
+    const myProjects = projects.filter(p => {
+      if (p.adminId === cur.id || !p.adminId) return true; // Creator or legacy
+      const en = enrolls.find(e => e.projectId === p.id && e.userId === cur.id && e.status === 'approved');
+      return !!en; // Approved co-admin
+    });
+    
     const sel = document.getElementById('projectSelect');
     
     // Remember current selection
@@ -129,6 +150,40 @@ function initAdminApp() {
     document.getElementById('projectSelect').dispatchEvent(new Event('change'));
   });
 
+  // Admin Join Project Logic
+  document.getElementById('joinAdminProjectBtn')?.addEventListener('click', () => {
+    document.getElementById('joinProjectPanel').classList.remove('hidden');
+    const projects = JSON.parse(localStorage.getItem('meal_projects')) || [];
+    const enrolls = JSON.parse(localStorage.getItem('meal_enrollments')) || [];
+    const sel = document.getElementById('allProjectsSelect');
+    sel.innerHTML = '<option value="">— Select Project to Join —</option>';
+    
+    projects.forEach(p => {
+      if (p.adminId === cur.id) return; // Don't show projects they created
+      const en = enrolls.find(e => e.projectId === p.id && e.userId === cur.id);
+      if (en) return; // Already requested or approved
+      sel.innerHTML += `<option value="${p.id}">${p.name}</option>`;
+    });
+  });
+
+  document.getElementById('cancelJoinProject')?.addEventListener('click', () => {
+    document.getElementById('joinProjectPanel').classList.add('hidden');
+  });
+
+  document.getElementById('confirmJoinProject')?.addEventListener('click', () => {
+    const pid = document.getElementById('allProjectsSelect').value;
+    if (!pid) return showToast('Select a project', 'error');
+    
+    const enrolls = JSON.parse(localStorage.getItem('meal_enrollments')) || [];
+    const newEn = { projectId: pid, userId: cur.id, status: 'pending', moneyGiven: 0 };
+    enrolls.push(newEn);
+    localStorage.setItem('meal_enrollments', JSON.stringify(enrolls));
+    if (window.fbCreate) window.fbCreate('meal_enrollments', `${pid}_${cur.id}`, newEn);
+    
+    showToast('Co-Admin Request Sent to Creator!');
+    document.getElementById('joinProjectPanel').classList.add('hidden');
+  });
+
   // Delete Project
   document.getElementById('delProjectBtn')?.addEventListener('click', () => {
     if (!curProjId) return;
@@ -182,7 +237,15 @@ function initAdminApp() {
     if (curProjId) {
       document.getElementById('workspace').classList.remove('hidden');
       document.getElementById('exportPdfBtn').classList.remove('hidden');
-      document.getElementById('delProjectBtn')?.classList.remove('hidden');
+      
+      const projects = JSON.parse(localStorage.getItem('meal_projects')) || [];
+      const p = projects.find(x => x.id === curProjId);
+      if (p && p.adminId === cur.id) {
+        document.getElementById('delProjectBtn')?.classList.remove('hidden');
+      } else {
+        document.getElementById('delProjectBtn')?.classList.add('hidden');
+      }
+      
       document.getElementById('pdfTitle').innerHTML = `<i class="fas fa-file-invoice" style="color:var(--primary);"></i> ${e.target.options[e.target.selectedIndex].text}`;
       loadMenu();
       refresh();
@@ -264,15 +327,16 @@ function initAdminApp() {
     pEnrolls.forEach(en => {
       const u = users.find(x => x.id === en.userId);
       if(!u) return;
+      const roleBadge = u.role === 'admin' ? `<span class="badge badge-purple" style="margin-left:5px;font-size:0.6rem;">Admin</span>` : '';
       if (en.status === 'pending') {
         rBody.innerHTML += `<tr>
-          <td>${u.name}</td><td>${u.email}</td>
+          <td>${u.name} ${roleBadge}</td><td>${u.email}</td>
           <td><span class="badge badge-yellow">Pending</span></td>
           <td><button class="btn btn-success btn-sm btn-approve" data-id="${u.id}"><i class="fas fa-check"></i> Accept</button></td>
         </tr>`;
       } else if (en.status === 'approved') {
         mBody.innerHTML += `<tr>
-          <td>${u.name}</td><td>${u.email}</td>
+          <td>${u.name} ${roleBadge}</td><td>${u.email}</td>
           <td><span class="badge badge-green"><i class="fas fa-check-circle"></i> Active</span></td>
           <td class="tc">
             <button class="btn btn-warning btn-sm btn-rem-mem-global" data-id="${u.id}" title="Remove from Project"><i class="fas fa-user-minus"></i></button>
@@ -380,6 +444,19 @@ function initAdminApp() {
         }
         localStorage.setItem('meal_records', JSON.stringify(records));
         if (window.fbCreate) window.fbCreate('meal_records', `${curProjId}_${uid}_${dStr}`, rObj);
+        
+        // Notify User
+        const notifs = JSON.parse(localStorage.getItem('meal_notifications')) || [];
+        const nObj = {
+          id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+          projectId: curProjId,
+          to: uid,
+          message: `Admin updated your meal for ${dStr}.`,
+          time: Date.now()
+        };
+        notifs.push(nObj);
+        localStorage.setItem('meal_notifications', JSON.stringify(notifs));
+        if (window.fbCreate) window.fbCreate('meal_notifications', nObj.id, nObj);
         
         const u = users.find(x => x.id === uid);
         showToast(`Meal updated for ${u ? u.name : 'User'}!`);

@@ -50,8 +50,22 @@ function initUserApp() {
     window.location.href = 'login.html';
   });
 
+  let shownNotifs = new Set((JSON.parse(localStorage.getItem('meal_notifications')) || []).map(n => n.id));
+
   window.addEventListener('storage', e => {
     if(!e.key || ['meal_records','meal_enrollments','meal_projects','meal_comments'].includes(e.key)) initUser();
+    
+    if(!e.key || e.key === 'meal_notifications') {
+      const notifs = JSON.parse(localStorage.getItem('meal_notifications')) || [];
+      notifs.forEach(n => {
+        if (!shownNotifs.has(n.id)) {
+          shownNotifs.add(n.id);
+          if (curProj && n.projectId === curProj.id && n.to === cur.id) {
+            showToast(n.message, 'info');
+          }
+        }
+      });
+    }
   });
 
   // Fallback for real-time sync on local files (file://) where storage events fail
@@ -166,6 +180,20 @@ function initUserApp() {
     }
     localStorage.setItem('meal_records', JSON.stringify(records));
     if (window.fbCreate) window.fbCreate('meal_records', `${curProj.id}_${cur.id}_${dStr}`, rObj);
+    
+    // Notify Admins
+    const notifs = JSON.parse(localStorage.getItem('meal_notifications')) || [];
+    const nObj = {
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+      projectId: curProj.id,
+      to: 'admin',
+      message: `${cur.name} updated their meal for ${dStr}.`,
+      time: Date.now()
+    };
+    notifs.push(nObj);
+    localStorage.setItem('meal_notifications', JSON.stringify(notifs));
+    if (window.fbCreate) window.fbCreate('meal_notifications', nObj.id, nObj);
+    
     calcFinances();
   };
 

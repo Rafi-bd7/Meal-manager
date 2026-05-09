@@ -34,6 +34,7 @@
           <option value="">— Select Month —</option>
         </select>
         <button id="newProjectBtn" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> New</button>
+        <button id="joinAdminProjectBtn" class="btn btn-outline btn-sm"><i class="fas fa-handshake"></i> Join</button>
         <button id="delProjectBtn" class="btn btn-danger btn-sm hidden" title="Delete Current Project"><i class="fas fa-trash"></i> Delete</button>
       </div>
       <div class="flex gap-2">
@@ -51,6 +52,18 @@
         <input type="text" id="newProjectName" class="form-control" placeholder="e.g. May 2026 Mess" style="flex:1; min-width:200px;">
         <button id="confirmNewProject" class="btn btn-primary"><i class="fas fa-check"></i> Create</button>
         <button id="cancelNewProject" class="btn btn-outline"><i class="fas fa-times"></i> Cancel</button>
+      </div>
+    </div>
+
+    <!-- Join Project Form (Admin) -->
+    <div id="joinProjectPanel" class="glass-panel mb-3 hidden fade-in" style="border-color:var(--warning);">
+      <h3 style="font-size:1rem; margin-bottom:1rem;"><i class="fas fa-handshake" style="color:var(--warning);"></i> Request Co-Admin Access</h3>
+      <div class="flex gap-3 flex-wrap">
+        <select id="allProjectsSelect" class="form-control" style="flex:1; min-width:200px;">
+          <option value="">— Select Project to Join —</option>
+        </select>
+        <button id="confirmJoinProject" class="btn btn-primary"><i class="fas fa-paper-plane"></i> Send Request</button>
+        <button id="cancelJoinProject" class="btn btn-outline"><i class="fas fa-times"></i> Cancel</button>
       </div>
     </div>
 
