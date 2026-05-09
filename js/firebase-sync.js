@@ -14,7 +14,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-const SYNC_KEYS = ['meal_users', 'meal_projects', 'meal_enrollments', 'meal_records', 'meal_comments', 'meal_notifications'];
+const SYNC_KEYS = ['meal_users', 'meal_projects', 'meal_enrollments', 'meal_records', 'meal_comments', 'meal_notifications', 'meal_chats'];
 
 window.fbCreate = (key, id, data) => set(ref(db, `${key}/${id}`), data).catch(console.error);
 window.fbUpdate = (key, id, data) => update(ref(db, `${key}/${id}`), data).catch(console.error);

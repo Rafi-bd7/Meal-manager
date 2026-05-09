@@ -121,6 +121,7 @@ function initUserApp() {
           calcFinances();
           loadMyComments();
           loadProfiles();
+          window.dispatchEvent(new Event('refreshChat'));
         }
       }
     } else {
@@ -136,6 +137,7 @@ function initUserApp() {
   if(mdInp) { mdInp.value = localDate; mdInp.addEventListener('change', loadMeals); }
 
   initUser();
+  if (window.initChat) window.initChat(cur, () => curProj ? curProj.id : null);
 
   document.getElementById('joinBtn')?.addEventListener('click', () => {
     const pid = document.getElementById('projectsSelect').value;

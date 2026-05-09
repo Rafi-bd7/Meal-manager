@@ -111,6 +111,7 @@ function initAdminApp() {
     }
   }
   loadProjects();
+  if (window.initChat) window.initChat(cur, () => curProjId);
 
   // Create Project
   document.getElementById('newProjectBtn').addEventListener('click', () => {
@@ -254,6 +255,7 @@ function initAdminApp() {
       document.getElementById('exportPdfBtn').classList.add('hidden');
       document.getElementById('delProjectBtn')?.classList.add('hidden');
     }
+    window.dispatchEvent(new Event('refreshChat'));
   });
 
   // Set default date for tracker
