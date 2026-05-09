@@ -368,7 +368,6 @@ function initUserApp() {
         <td>${photoHtml}</td>
         <td><strong>${u.name}</strong></td>
         <td>${u.email}</td>
-        <td>${u.password}</td>
       </tr>`;
     });
   }

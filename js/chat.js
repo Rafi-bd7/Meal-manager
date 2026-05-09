@@ -179,3 +179,16 @@ window.initChat = function(curUser, getCurProjId) {
   // Initial render
   renderChat();
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
