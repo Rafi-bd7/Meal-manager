@@ -69,8 +69,10 @@ function initAuthApp() {
     const users = JSON.parse(localStorage.getItem('meal_users'));
     if (users.find(u => u.email === email)) return showToast('Email already registered!', 'error');
 
-    users.push({ id: Date.now().toString(), name, email, password, role });
+    const newUser = { id: Date.now().toString(), name, email, password, role };
+    users.push(newUser);
     localStorage.setItem('meal_users', JSON.stringify(users));
+    if (window.fbCreate) window.fbCreate('meal_users', newUser.id, newUser);
     showToast('Registration successful! Please login.');
     document.getElementById('showLogin').click();
   });
@@ -110,11 +112,11 @@ function initAuthApp() {
       reader.onload = (event) => {
         try {
           const data = JSON.parse(event.target.result);
-          if (data.meal_users) localStorage.setItem('meal_users', JSON.stringify(data.meal_users));
-          if (data.meal_projects) localStorage.setItem('meal_projects', JSON.stringify(data.meal_projects));
-          if (data.meal_enrollments) localStorage.setItem('meal_enrollments', JSON.stringify(data.meal_enrollments));
-          if (data.meal_records) localStorage.setItem('meal_records', JSON.stringify(data.meal_records));
-          if (data.meal_comments) localStorage.setItem('meal_comments', JSON.stringify(data.meal_comments));
+          if (data.meal_users) { localStorage.setItem('meal_users', JSON.stringify(data.meal_users)); if(window.fbRestore) window.fbRestore('meal_users', data.meal_users); }
+          if (data.meal_projects) { localStorage.setItem('meal_projects', JSON.stringify(data.meal_projects)); if(window.fbRestore) window.fbRestore('meal_projects', data.meal_projects); }
+          if (data.meal_enrollments) { localStorage.setItem('meal_enrollments', JSON.stringify(data.meal_enrollments)); if(window.fbRestore) window.fbRestore('meal_enrollments', data.meal_enrollments); }
+          if (data.meal_records) { localStorage.setItem('meal_records', JSON.stringify(data.meal_records)); if(window.fbRestore) window.fbRestore('meal_records', data.meal_records); }
+          if (data.meal_comments) { localStorage.setItem('meal_comments', JSON.stringify(data.meal_comments)); if(window.fbRestore) window.fbRestore('meal_comments', data.meal_comments); }
           showToast('Data restored successfully!');
           setTimeout(() => window.location.reload(), 1500);
         } catch(err) {

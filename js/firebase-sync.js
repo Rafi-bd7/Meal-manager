@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
-import { getDatabase, ref, onValue, set, get } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-database.js";
+import { getDatabase, ref, onValue, set, get, update, remove } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAs007T9qwgk3N-OYo7GoashXFw5DcNCz8",
@@ -15,16 +15,19 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 const SYNC_KEYS = ['meal_users', 'meal_projects', 'meal_enrollments', 'meal_records', 'meal_comments'];
-let isSyncingFromFirebase = false;
-const originalSetItem = localStorage.setItem;
 
-localStorage.setItem = function(key, value) {
-  originalSetItem.apply(this, arguments);
-  if (!isSyncingFromFirebase && SYNC_KEYS.includes(key)) {
-    try {
-      set(ref(db, key), JSON.parse(value)).catch(console.error);
-    } catch(e) { console.error("Firebase Sync Error:", e); }
-  }
+window.fbCreate = (key, id, data) => set(ref(db, `${key}/${id}`), data).catch(console.error);
+window.fbUpdate = (key, id, data) => update(ref(db, `${key}/${id}`), data).catch(console.error);
+window.fbDelete = (key, id) => remove(ref(db, `${key}/${id}`)).catch(console.error);
+
+window.fbRestore = (key, array) => {
+  const obj = {};
+  array.forEach(item => {
+    if (key === 'meal_enrollments') obj[`${item.projectId}_${item.userId}`] = item;
+    else if (key === 'meal_records') obj[`${item.projectId}_${item.userId}_${item.date}`] = item;
+    else obj[item.id] = item;
+  });
+  return set(ref(db, key), obj).catch(console.error);
 };
 
 // Disable UI while loading data
@@ -43,19 +46,15 @@ function normalizeArray(data) {
 }
 
 Promise.all(SYNC_KEYS.map(key => get(ref(db, key)))).then(snapshots => {
-  isSyncingFromFirebase = true;
   snapshots.forEach((snapshot, index) => {
     const key = SYNC_KEYS[index];
     if (snapshot.exists()) {
       const data = normalizeArray(snapshot.val());
-      originalSetItem.call(localStorage, key, JSON.stringify(data));
+      localStorage.setItem(key, JSON.stringify(data));
     } else {
-      // If it doesn't exist in Firebase, it means the array is empty. 
-      // Do NOT migrate stale local data back to Firebase. Just clear local.
-      originalSetItem.call(localStorage, key, '[]');
+      localStorage.setItem(key, '[]');
     }
   });
-  isSyncingFromFirebase = false;
 
   // Real-time listeners
   SYNC_KEYS.forEach(key => {
@@ -64,9 +63,7 @@ Promise.all(SYNC_KEYS.map(key => get(ref(db, key)))).then(snapshots => {
       data = normalizeArray(data);
       const stringified = JSON.stringify(data);
       if (localStorage.getItem(key) !== stringified) {
-        isSyncingFromFirebase = true;
-        originalSetItem.call(localStorage, key, stringified);
-        isSyncingFromFirebase = false;
+        localStorage.setItem(key, stringified);
         // Trigger storage event so admin.js / user.js UI re-renders automatically
         const e = new Event('storage');
         e.key = key;

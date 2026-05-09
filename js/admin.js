@@ -66,18 +66,22 @@ function initAdminApp() {
 
   function loadProjects() {
     const projects = JSON.parse(localStorage.getItem('meal_projects')) || [];
+    const myProjects = projects.filter(p => p.adminId === cur.id);
     const sel = document.getElementById('projectSelect');
     sel.innerHTML = '<option value="">— Select Month —</option>';
     
-    projects.forEach(p => sel.innerHTML += `<option value="${p.id}">${p.name}</option>`);
+    myProjects.forEach(p => sel.innerHTML += `<option value="${p.id}">${p.name}</option>`);
     
     // Auto-select logic
-    if (!curProjId && projects.length > 0) {
-      curProjId = projects[projects.length - 1].id;
+    if (!curProjId && myProjects.length > 0) {
+      curProjId = myProjects[myProjects.length - 1].id;
     }
     
-    if (curProjId && projects.find(p => p.id === curProjId)) {
+    if (curProjId && myProjects.find(p => p.id === curProjId)) {
       sel.value = curProjId;
+    } else {
+      curProjId = '';
+      sel.value = '';
     }
   }
   loadProjects();
@@ -100,6 +104,7 @@ function initAdminApp() {
     const p = { id: Date.now().toString(), name, adminId: cur.id, menu };
     projects.push(p);
     localStorage.setItem('meal_projects', JSON.stringify(projects));
+    if (window.fbCreate) window.fbCreate('meal_projects', p.id, p);
     
     showToast('Project Created!');
     document.getElementById('newProjectPanel').classList.add('hidden');
@@ -171,12 +176,16 @@ function initAdminApp() {
     if(users.find(u => u.email === email)) return showToast('Email already registered!', 'error');
     
     const uid = Date.now().toString() + Math.random().toString(36).substr(2, 5);
-    users.push({ id: uid, name, email, password, role: 'user' });
+    const newUser = { id: uid, name, email, password, role: 'user' };
+    users.push(newUser);
     localStorage.setItem('meal_users', JSON.stringify(users));
+    if (window.fbCreate) window.fbCreate('meal_users', uid, newUser);
     
     const enrolls = JSON.parse(localStorage.getItem('meal_enrollments')) || [];
-    enrolls.push({ projectId: curProjId, userId: uid, status: 'approved', moneyGiven: 0 });
+    const newEn = { projectId: curProjId, userId: uid, status: 'approved', moneyGiven: 0 };
+    enrolls.push(newEn);
     localStorage.setItem('meal_enrollments', JSON.stringify(enrolls));
+    if (window.fbCreate) window.fbCreate('meal_enrollments', `${curProjId}_${uid}`, newEn);
     
     showToast('Member added to database & project!');
     document.getElementById('cancelNewMember').click();
@@ -220,6 +229,7 @@ function initAdminApp() {
       if (idx > -1) {
         enrolls[idx].status = 'approved';
         localStorage.setItem('meal_enrollments', JSON.stringify(enrolls));
+        if (window.fbUpdate) window.fbUpdate('meal_enrollments', `${curProjId}_${uid}`, { status: 'approved' });
         showToast('Member Approved!');
         refresh();
       }
@@ -230,6 +240,7 @@ function initAdminApp() {
       const uid = e.currentTarget.dataset.id;
       const nf = enrolls.filter(x => !(x.projectId === curProjId && x.userId === uid));
       localStorage.setItem('meal_enrollments', JSON.stringify(nf));
+      if (window.fbDelete) window.fbDelete('meal_enrollments', `${curProjId}_${uid}`);
       showToast('Removed from project.');
       refresh();
     }));
@@ -239,8 +250,12 @@ function initAdminApp() {
       const uid = e.currentTarget.dataset.id;
       const nUsers = users.filter(x => x.id !== uid);
       localStorage.setItem('meal_users', JSON.stringify(nUsers));
+      if (window.fbDelete) window.fbDelete('meal_users', uid);
       const nEnrolls = enrolls.filter(x => x.userId !== uid);
       localStorage.setItem('meal_enrollments', JSON.stringify(nEnrolls));
+      enrolls.filter(x => x.userId === uid).forEach(en => {
+        if (window.fbDelete) window.fbDelete('meal_enrollments', `${en.projectId}_${uid}`);
+      });
       showToast('User deleted from database.');
       refresh();
     }));
@@ -352,6 +367,7 @@ function initAdminApp() {
       if(idx > -1) {
         enrolls[idx].moneyGiven = val;
         localStorage.setItem('meal_enrollments', JSON.stringify(enrolls));
+        if (window.fbUpdate) window.fbUpdate('meal_enrollments', `${curProjId}_${uid}`, { moneyGiven: val });
         showToast('Deposit updated! Stats recalculated.');
         calculateFinances();
       }
@@ -361,6 +377,7 @@ function initAdminApp() {
       const uid = e.currentTarget.dataset.id;
       const nf = enrolls.filter(x => !(x.projectId === curProjId && x.userId === uid));
       localStorage.setItem('meal_enrollments', JSON.stringify(nf));
+      if (window.fbDelete) window.fbDelete('meal_enrollments', `${curProjId}_${uid}`);
       showToast('Member removed.');
       refresh();
     }));
@@ -399,6 +416,7 @@ function initAdminApp() {
       const cid = e.currentTarget.dataset.id;
       const nCom = comments.filter(x => x.id !== cid);
       localStorage.setItem('meal_comments', JSON.stringify(nCom));
+      if (window.fbDelete) window.fbDelete('meal_comments', cid);
       loadComments();
     }));
   }
@@ -428,6 +446,7 @@ function initAdminApp() {
       projects[pIdx].menu[inp.dataset.day][inp.dataset.type] = inp.value;
     });
     localStorage.setItem('meal_projects', JSON.stringify(projects));
+    if (window.fbUpdate) window.fbUpdate('meal_projects', curProjId, { menu: projects[pIdx].menu });
     showToast('Menu saved!');
   });
 
@@ -491,11 +510,11 @@ function initAdminApp() {
       reader.onload = (event) => {
         try {
           const data = JSON.parse(event.target.result);
-          if (data.meal_users) localStorage.setItem('meal_users', JSON.stringify(data.meal_users));
-          if (data.meal_projects) localStorage.setItem('meal_projects', JSON.stringify(data.meal_projects));
-          if (data.meal_enrollments) localStorage.setItem('meal_enrollments', JSON.stringify(data.meal_enrollments));
-          if (data.meal_records) localStorage.setItem('meal_records', JSON.stringify(data.meal_records));
-          if (data.meal_comments) localStorage.setItem('meal_comments', JSON.stringify(data.meal_comments));
+          if (data.meal_users) { localStorage.setItem('meal_users', JSON.stringify(data.meal_users)); if(window.fbRestore) window.fbRestore('meal_users', data.meal_users); }
+          if (data.meal_projects) { localStorage.setItem('meal_projects', JSON.stringify(data.meal_projects)); if(window.fbRestore) window.fbRestore('meal_projects', data.meal_projects); }
+          if (data.meal_enrollments) { localStorage.setItem('meal_enrollments', JSON.stringify(data.meal_enrollments)); if(window.fbRestore) window.fbRestore('meal_enrollments', data.meal_enrollments); }
+          if (data.meal_records) { localStorage.setItem('meal_records', JSON.stringify(data.meal_records)); if(window.fbRestore) window.fbRestore('meal_records', data.meal_records); }
+          if (data.meal_comments) { localStorage.setItem('meal_comments', JSON.stringify(data.meal_comments)); if(window.fbRestore) window.fbRestore('meal_comments', data.meal_comments); }
           showToast('Data restored successfully! Reloading...');
           setTimeout(() => window.location.reload(), 1500);
         } catch(err) {

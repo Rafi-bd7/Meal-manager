@@ -126,8 +126,10 @@ function initUserApp() {
     const pid = document.getElementById('projectsSelect').value;
     if(!pid) return showToast('Please select a project','error');
     const enrolls = JSON.parse(localStorage.getItem('meal_enrollments')) || [];
-    enrolls.push({ projectId: pid, userId: cur.id, status: 'pending', moneyGiven: 0 });
+    const newEn = { projectId: pid, userId: cur.id, status: 'pending', moneyGiven: 0 };
+    enrolls.push(newEn);
     localStorage.setItem('meal_enrollments', JSON.stringify(enrolls));
+    if (window.fbCreate) window.fbCreate('meal_enrollments', `${pid}_${cur.id}`, newEn);
     showToast('Request sent to admin!');
     initUser();
   });
@@ -155,12 +157,14 @@ function initUserApp() {
     const records = JSON.parse(localStorage.getItem('meal_records')) || [];
     const idx = records.findIndex(x => x.projectId === curProj.id && x.userId === cur.id && x.date === dStr);
 
+    const rObj = { projectId: curProj.id, userId: cur.id, date: dStr, breakfast: b, lunch: l, dinner: d };
     if(idx > -1) {
-      records[idx].breakfast = b; records[idx].lunch = l; records[idx].dinner = d;
+      records[idx] = rObj;
     } else {
-      records.push({ projectId: curProj.id, userId: cur.id, date: dStr, breakfast: b, lunch: l, dinner: d });
+      records.push(rObj);
     }
     localStorage.setItem('meal_records', JSON.stringify(records));
+    if (window.fbCreate) window.fbCreate('meal_records', `${curProj.id}_${cur.id}_${dStr}`, rObj);
     calcFinances();
   };
 
@@ -247,8 +251,10 @@ function initUserApp() {
     if(!curProj) return;
 
     const comments = JSON.parse(localStorage.getItem('meal_comments')) || [];
-    comments.push({ id: Date.now().toString(), projectId: curProj.id, userId: cur.id, text: txt, time: Date.now() });
+    const cObj = { id: Date.now().toString(), projectId: curProj.id, userId: cur.id, text: txt, time: Date.now() };
+    comments.push(cObj);
     localStorage.setItem('meal_comments', JSON.stringify(comments));
+    if (window.fbCreate) window.fbCreate('meal_comments', cObj.id, cObj);
     inp.value = '';
     showToast('Comment sent to admin!');
     loadMyComments();
