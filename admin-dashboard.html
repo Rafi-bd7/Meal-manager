@@ -98,7 +98,6 @@
         <button class="tab-btn" data-tab="finances"><i class="fas fa-file-invoice-dollar"></i> Finances</button>
         <button class="tab-btn" data-tab="bazaar"><i class="fas fa-shopping-basket"></i> বাজার খরচ</button>
         <button class="tab-btn" data-tab="bills"><i class="fas fa-file-invoice"></i> মাসিক বিল</button>
-        <button class="tab-btn" data-tab="comments"><i class="fas fa-comments"></i> Comments <span id="commentBadge" class="badge badge-blue" style="font-size:.65rem;"></span></button>
         <button class="tab-btn" data-tab="menu"><i class="fas fa-list-ul"></i> Weekly Menu</button>
         <button class="tab-btn" data-tab="members"><i class="fas fa-users"></i> Members</button>
         <button class="tab-btn" data-tab="notices"><i class="fas fa-bullhorn"></i> নোটিশ ও ঘোষণা</button>
@@ -213,8 +212,9 @@
                 <th>পণ্য</th>
                 <th class="tc">ধরন</th>
                 <th class="tc">টাকা (৳)</th>
+                <th>যোগ করেছে</th>
                 <th>নোট</th>
-                <th class="tc">মুছুন</th>
+                <th class="tc">অ্যাকশন</th>
               </tr>
             </thead>
             <tbody id="bazaarBody"></tbody>
@@ -407,17 +407,6 @@
         </div>
       </div>
 
-      <!-- Tab: Comments -->
-      <div id="tab-comments" class="tab-content glass-panel">
-        <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
-          <h3 style="font-size:1.05rem; margin:0;"><i class="fas fa-comments" style="color:var(--primary);"></i> সদস্যদের মন্তব্য ও বার্তা</h3>
-          <span class="text-muted" style="font-size:0.8rem;">মেম্বারদের পাঠানো বার্তা দেখুন ও সরাসরি উত্তর দিন</span>
-        </div>
-        <div id="commentsContainer" style="display:flex; flex-direction:column; gap:1rem; min-height:100px;">
-          <p class="text-muted text-center py-4">এখনো কোনো মন্তব্য নেই।</p>
-        </div>
-      </div>
-
       <!-- Tab: Weekly Menu -->
       <div id="tab-menu" class="tab-content glass-panel">
         <h3 style="font-size:1.05rem; margin-bottom:1.25rem;"><i class="fas fa-utensils" style="color:var(--primary);"></i> Weekly Food Menu</h3>
@@ -514,6 +503,44 @@
         <div id="noticesHistoryList" style="display:flex; flex-direction:column; gap:0.75rem;">
           <p class="text-muted text-center py-3">কোনো নোটিশ পাঠানো হয়নি।</p>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Expense Modal -->
+  <div id="editExpModal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="flex justify-between items-center mb-3">
+        <h3 style="font-size:1.1rem; margin:0; font-weight:700;"><i class="fas fa-edit" style="color:var(--primary);"></i> বাজারের হিসাব সম্পাদনা</h3>
+        <button type="button" id="closeEditExpModalBtn" style="background:none; border:none; color:var(--text-muted); font-size:1.3rem; cursor:pointer;"><i class="fas fa-times"></i></button>
+      </div>
+      <input type="hidden" id="editExpId">
+      <div class="form-group mb-2">
+        <label class="form-label" style="font-size:0.85rem; font-weight:600;">তারিখ</label>
+        <input type="date" id="editExpDate" class="form-control">
+      </div>
+      <div class="form-group mb-2">
+        <label class="form-label" style="font-size:0.85rem; font-weight:600;">পণ্যের নাম</label>
+        <input type="text" id="editExpItem" class="form-control" placeholder="পণ্যের নাম">
+      </div>
+      <div class="form-group mb-2">
+        <label class="form-label" style="font-size:0.85rem; font-weight:600;">টাকার পরিমাণ (৳)</label>
+        <input type="number" id="editExpAmount" class="form-control" placeholder="0" min="1">
+      </div>
+      <div class="form-group mb-2">
+        <label class="form-label" style="font-size:0.85rem; font-weight:600;">ক্যাটাগরি</label>
+        <select id="editExpCategory" class="form-control">
+          <option value="bazaar">🛒 বাজার</option>
+          <option value="other">📦 অন্যান্য</option>
+        </select>
+      </div>
+      <div class="form-group mb-3">
+        <label class="form-label" style="font-size:0.85rem; font-weight:600;">নোট</label>
+        <input type="text" id="editExpNote" class="form-control" placeholder="নোট (ঐচ্ছিক)">
+      </div>
+      <div class="flex justify-end gap-2">
+        <button type="button" id="cancelEditExpBtn" class="btn btn-outline">বাতিল</button>
+        <button type="button" id="saveEditExpBtn" class="btn btn-primary"><i class="fas fa-save"></i> সংরক্ষণ করুন</button>
       </div>
     </div>
   </div>

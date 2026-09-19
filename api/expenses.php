@@ -11,14 +11,18 @@ if ($action === 'list') {
     $month = $_GET['month'] ?? ''; // YYYY-MM
     if (!$pid) jsonResponse(['error' => 'project_id required'], 400);
 
-    $sql = "SELECT id, project_id as projectId, user_id as userId, date, item, amount, category, note, created_at
-            FROM market_expenses WHERE project_id = ?";
+    $sql = "SELECT me.id, me.project_id as projectId, me.user_id as userId, me.date,
+                   me.item, me.amount, me.category, me.note, me.created_at,
+                   u.name as userName
+            FROM market_expenses me
+            LEFT JOIN users u ON me.user_id = u.id
+            WHERE me.project_id = ?";
     $params = [$pid];
 
-    if ($date) { $sql .= " AND date = ?"; $params[] = $date; }
-    if ($month) { $sql .= " AND DATE_FORMAT(date,'%Y-%m') = ?"; $params[] = $month; }
+    if ($date) { $sql .= " AND me.date = ?"; $params[] = $date; }
+    if ($month) { $sql .= " AND DATE_FORMAT(me.date,'%Y-%m') = ?"; $params[] = $month; }
 
-    $sql .= " ORDER BY date DESC, created_at DESC";
+    $sql .= " ORDER BY me.date DESC, me.created_at DESC";
     $stmt = $db->prepare($sql);
     $stmt->execute($params);
     $rows = $stmt->fetchAll();
@@ -52,6 +56,29 @@ if ($action === 'add') {
                       'date' => $date, 'item' => $item, 'amount' => $amount,
                       'category' => $cat, 'note' => $note]
     ], 201);
+}
+
+// ── POST: Update/Edit an existing market expense entry
+if ($action === 'update' || $action === 'edit') {
+    $data = getBody();
+    $id     = $data['id'] ?? '';
+    $pid    = $data['project_id'] ?? '';
+    $date   = $data['date'] ?? '';
+    $item   = trim($data['item'] ?? '');
+    $amount = floatval($data['amount'] ?? 0);
+    $cat    = $data['category'] ?? 'bazaar';
+    $note   = $data['note'] ?? '';
+
+    if (!$id || !$pid || !$item || $amount <= 0 || !$date) {
+        jsonResponse(['error' => 'id, project_id, date, item and amount are required'], 400);
+    }
+
+    $stmt = $db->prepare("UPDATE market_expenses
+                          SET date = ?, item = ?, amount = ?, category = ?, note = ?
+                          WHERE id = ? AND project_id = ?");
+    $stmt->execute([$date, $item, $amount, $cat, $note, $id, $pid]);
+
+    jsonResponse(['success' => true, 'message' => 'Expense updated successfully']);
 }
 
 // ── DELETE: Remove an expense entry

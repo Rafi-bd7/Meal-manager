@@ -77,11 +77,11 @@
         </div>
       </div>
 
-      <div class="tabs">
+      <div class="tabs" style="flex-wrap:wrap;">
         <button class="tab-btn active" data-tab="meals"><i class="fas fa-calendar-check"></i> Daily Meals</button>
-        <button class="tab-btn" data-tab="comments"><i class="fas fa-comment-alt"></i> My Comments</button>
-        <button class="tab-btn" data-tab="menu"><i class="fas fa-list"></i> Weekly Menu</button>
+        <button class="tab-btn" data-tab="bazaar"><i class="fas fa-shopping-basket"></i> বাজার খরচ</button>
         <button class="tab-btn" data-tab="bills"><i class="fas fa-file-invoice"></i> মাসিক বিল</button>
+        <button class="tab-btn" data-tab="menu"><i class="fas fa-list"></i> Weekly Menu</button>
         <button class="tab-btn" data-tab="notices"><i class="fas fa-bullhorn"></i> নোটিশ বোর্ড <span id="userNoticeBadge" class="badge badge-blue" style="font-size:.65rem; display:none;">New</span></button>
         <button class="tab-btn" data-tab="profiles"><i class="fas fa-id-badge"></i> Member Profiles</button>
       </div>
@@ -122,20 +122,71 @@
         </div>
       </div>
 
-      <!-- Tab: Comments -->
-      <div id="tab-comments" class="tab-content glass-panel">
-        <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
-          <h3 style="font-size:1.05rem; margin:0;"><i class="fas fa-comment-dots" style="color:var(--primary);"></i> ম্যানেজারের কাছে মন্তব্য / বার্তা</h3>
-          <span class="text-muted" style="font-size:0.8rem;">আপনার পাঠানো বার্তা এবং ম্যানেজারের উত্তর</span>
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <!-- Tab: বাজার খরচ (Daily Market & Expense Tracker for User)  -->
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <div id="tab-bazaar" class="tab-content glass-panel">
+        <div class="flex items-center justify-between flex-wrap gap-3 mb-3">
+          <h3 style="font-size:1.05rem; margin:0;"><i class="fas fa-shopping-basket" style="color:var(--accent);"></i> মেসের বাজার ও খরচের খাতা</h3>
+          <input type="month" id="bazaarMonth" class="form-control" style="width:auto; padding:.5rem .85rem;">
         </div>
-        <div id="myCommentsContainer" class="mb-3" style="display:flex; flex-direction:column; gap:1rem; min-height:80px;">
-          <p class="text-muted text-center py-3">কোনো মন্তব্য নেই।</p>
+
+        <!-- Summary Cards -->
+        <div class="grid-3 mb-3" id="bazaarSummaryCards">
+          <div class="stat-card card-3d">
+            <div class="stat-label"><i class="fas fa-shopping-cart"></i> চলতি মাসের মোট বাজার</div>
+            <div class="stat-value" id="bazaarTotalMonth">0 ৳</div>
+            <i class="fas fa-store stat-icon"></i>
+          </div>
+          <div class="stat-card card-3d">
+            <div class="stat-label"><i class="fas fa-calendar-day"></i> আজকের বাজার</div>
+            <div class="stat-value" id="bazaarTotalToday">0 ৳</div>
+            <i class="fas fa-calendar stat-icon"></i>
+          </div>
+          <div class="stat-card card-3d">
+            <div class="stat-label"><i class="fas fa-list-ol"></i> মোট এন্ট্রি</div>
+            <div class="stat-value" id="bazaarEntryCount">0</div>
+            <i class="fas fa-receipt stat-icon"></i>
+          </div>
         </div>
-        <div class="comment-input-area" style="display:flex; gap:0.5rem; align-items:center;">
-          <input type="text" id="commentInput" class="form-control" placeholder="ম্যানেজারকে কিছু লিখুন (যেমন: খাবারের মান, রিকুয়েস্ট)..." maxlength="500">
-          <button id="sendCommentBtn" class="btn btn-primary btn-sm" style="white-space:nowrap; padding:.6rem 1.2rem;"><i class="fas fa-paper-plane"></i> পাঠান</button>
+
+        <!-- Add Expense Form -->
+        <div class="glass-panel mb-3 fade-in" style="border-color:rgba(79,142,247,.3); padding:1.25rem;">
+          <h4 style="font-size:.95rem; margin-bottom:1rem; font-weight:700;"><i class="fas fa-plus-circle" style="color:var(--primary);"></i> নতুন বাজার / খরচ যোগ করুন</h4>
+          <div class="flex gap-3 flex-wrap">
+            <input type="date" id="expDate" class="form-control" style="min-width:140px; flex:0 0 auto;">
+            <input type="text" id="expItem" class="form-control" placeholder="পণ্যের নাম (চাল, ডাল, তেল, সবজি...)" style="flex:2; min-width:180px;">
+            <input type="number" id="expAmount" class="form-control" placeholder="টাকার পরিমাণ" min="1" style="flex:1; min-width:130px;">
+            <select id="expCategory" class="form-control" style="flex:0 0 auto; min-width:130px;">
+              <option value="bazaar">🛒 বাজার</option>
+              <option value="other">📦 অন্যান্য</option>
+            </select>
+            <input type="text" id="expNote" class="form-control" placeholder="নোট (ঐচ্ছিক)" style="flex:1; min-width:150px;">
+            <button id="addExpenseBtn" class="btn btn-primary"><i class="fas fa-plus"></i> যোগ করুন</button>
+          </div>
+        </div>
+
+        <!-- Expense Table -->
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>তারিখ</th>
+                <th>পণ্য</th>
+                <th class="tc">ধরন</th>
+                <th class="tc">টাকা (৳)</th>
+                <th>যোগ করেছে</th>
+                <th>নোট</th>
+                <th class="tc">অ্যাকশন</th>
+              </tr>
+            </thead>
+            <tbody id="bazaarBody">
+              <tr><td colspan="7" class="text-center text-muted py-3">বাজার লোড হচ্ছে...</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
+
 
       <!-- Tab: Menu -->
       <div id="tab-menu" class="tab-content glass-panel">
@@ -227,6 +278,32 @@
           </table>
         </div>
 
+        <!-- Bills History Table for User -->
+        <div class="mt-4">
+          <h4 style="font-size:.95rem; font-weight:700; margin-bottom:1rem;"><i class="fas fa-history" style="color:var(--primary);"></i> পূর্ববর্তী সকল মাসের বিলের ইতিহাস</h4>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>মাস</th>
+                  <th class="tc">বাড়ি ভাড়া</th>
+                  <th class="tc">বুয়ার বেতন</th>
+                  <th class="tc">WiFi</th>
+                  <th class="tc">গ্যাস</th>
+                  <th class="tc">বিদ্যুৎ</th>
+                  <th class="tc">ময়লা</th>
+                  <th class="tc">অন্যান্য</th>
+                  <th class="tc">মোট মেস বিল</th>
+                  <th class="tc" style="color:var(--accent);">আপনার প্রদেয় অংশ</th>
+                </tr>
+              </thead>
+              <tbody id="userBillsHistoryBody">
+                <tr><td colspan="10" class="text-center text-muted py-3">বিলের ইতিহাস লোড হচ্ছে...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         <!-- Printable PDF Container for User Bills (Hidden) -->
         <div id="userBillsPdfArea" style="display:none; background:#ffffff; color:#0f172a; padding:30px; font-family:'Inter', sans-serif;">
           <div style="border-bottom:3px solid #4f8ef7; padding-bottom:15px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center;">
@@ -266,6 +343,45 @@
       </div>
     </div>
   </div>
+
+  <!-- Edit Expense Modal -->
+  <div id="editExpModal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="flex justify-between items-center mb-3">
+        <h3 style="font-size:1.1rem; margin:0; font-weight:700;"><i class="fas fa-edit" style="color:var(--primary);"></i> বাজারের হিসাব সম্পাদনা</h3>
+        <button type="button" id="closeEditExpModalBtn" style="background:none; border:none; color:var(--text-muted); font-size:1.3rem; cursor:pointer;"><i class="fas fa-times"></i></button>
+      </div>
+      <input type="hidden" id="editExpId">
+      <div class="form-group mb-2">
+        <label class="form-label" style="font-size:0.85rem; font-weight:600;">তারিখ</label>
+        <input type="date" id="editExpDate" class="form-control">
+      </div>
+      <div class="form-group mb-2">
+        <label class="form-label" style="font-size:0.85rem; font-weight:600;">পণ্যের নাম</label>
+        <input type="text" id="editExpItem" class="form-control" placeholder="পণ্যের নাম">
+      </div>
+      <div class="form-group mb-2">
+        <label class="form-label" style="font-size:0.85rem; font-weight:600;">টাকার পরিমাণ (৳)</label>
+        <input type="number" id="editExpAmount" class="form-control" placeholder="0" min="1">
+      </div>
+      <div class="form-group mb-2">
+        <label class="form-label" style="font-size:0.85rem; font-weight:600;">ক্যাটাগরি</label>
+        <select id="editExpCategory" class="form-control">
+          <option value="bazaar">🛒 বাজার</option>
+          <option value="other">📦 অন্যান্য</option>
+        </select>
+      </div>
+      <div class="form-group mb-3">
+        <label class="form-label" style="font-size:0.85rem; font-weight:600;">নোট</label>
+        <input type="text" id="editExpNote" class="form-control" placeholder="নোট (ঐচ্ছিক)">
+      </div>
+      <div class="flex justify-end gap-2">
+        <button type="button" id="cancelEditExpBtn" class="btn btn-outline">বাতিল</button>
+        <button type="button" id="saveEditExpBtn" class="btn btn-primary"><i class="fas fa-save"></i> সংরক্ষণ করুন</button>
+      </div>
+    </div>
+  </div>
+
 
   <script src="js/api.js"></script>
   <script src="js/chat.js"></script>

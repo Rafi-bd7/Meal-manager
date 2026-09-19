@@ -59,7 +59,8 @@ function initUserApp() {
             body: body,
             icon: 'icons/icon-192.png',
             badge: 'icons/icon-192.png',
-            vibrate: [200, 100, 200],
+            vibrate: [300, 100, 300],
+            renotify: true,
             tag: 'meal-notice-' + Date.now()
           });
         }).catch(() => {
@@ -71,35 +72,49 @@ function initUserApp() {
     }
   }
 
+  // Check and display new push notifications
+  function checkNewNotices() {
+    const notifs = JSON.parse(localStorage.getItem('meal_notifications')) || [];
+    notifs.forEach(n => {
+      if (!shownNotifs.has(n.id)) {
+        shownNotifs.add(n.id);
+        const toTarget = n.to || n.to_user;
+        const projTarget = n.projectId || n.project_id;
+        if (curProj && projTarget === curProj.id && (toTarget === cur.id || toTarget === 'all')) {
+          showToast(`📢 ${n.message}`, 'info');
+          triggerDeviceNotification('📢 MealManager নোটিশ', n.message);
+        }
+      }
+    });
+    loadUserNotices();
+  }
+
   function refreshUserData() {
     initUser();
     loadUserBills();
+    if (typeof loadBazaar === 'function') loadBazaar();
+    checkNewNotices();
   }
 
   window.addEventListener('storage', e => {
-    if(!e.key || ['meal_records','meal_enrollments','meal_projects','meal_comments','meal_bills'].includes(e.key)) {
+    if (!e.key || ['meal_records','meal_enrollments','meal_projects','meal_bills','meal_expenses','meal_notifications'].includes(e.key)) {
       refreshUserData();
-    }
-    
-    if(!e.key || e.key === 'meal_notifications') {
-      const notifs = JSON.parse(localStorage.getItem('meal_notifications')) || [];
-      notifs.forEach(n => {
-        if (!shownNotifs.has(n.id)) {
-          shownNotifs.add(n.id);
-          const toTarget = n.to || n.to_user;
-          const projTarget = n.projectId || n.project_id;
-          if (curProj && projTarget === curProj.id && (toTarget === cur.id || toTarget === 'all')) {
-            showToast(n.message, 'info');
-            triggerDeviceNotification('MealManager Notice', n.message);
-          }
-        }
-      });
-      loadUserNotices();
     }
   });
 
   window.addEventListener('appDataSynced', refreshUserData);
   window.addEventListener('apiDataLoaded', refreshUserData);
+
+  // Auto request notification permission on first user tap/click
+  if ('Notification' in window && Notification.permission === 'default') {
+    const reqPermOnce = () => {
+      try { Notification.requestPermission(); } catch(e){}
+      document.removeEventListener('click', reqPermOnce);
+      document.removeEventListener('touchstart', reqPermOnce);
+    };
+    document.addEventListener('click', reqPermOnce, { once: true });
+    document.addEventListener('touchstart', reqPermOnce, { once: true });
+  }
 
   const tabs = document.querySelectorAll('.tab-btn');
   const contents = document.querySelectorAll('.tab-content');
@@ -113,10 +128,10 @@ function initUserApp() {
     // Dynamic data reload on tab switch so member always sees newest updates
     if (btn.dataset.tab === 'bills') {
       loadUserBills();
+    } else if (btn.dataset.tab === 'bazaar') {
+      if (typeof loadBazaar === 'function') loadBazaar();
     } else if (btn.dataset.tab === 'meals') {
       loadMeals();
-    } else if (btn.dataset.tab === 'comments') {
-      loadMyComments();
     } else if (btn.dataset.tab === 'menu') {
       loadMenu();
     } else if (btn.dataset.tab === 'notices') {
@@ -150,10 +165,10 @@ function initUserApp() {
         loadMenu();
         loadMeals();
         calcFinances();
-        loadMyComments();
         loadProfiles();
         loadUserNotices();
         loadUserBills();
+        if (typeof loadBazaar === 'function') loadBazaar();
         window.dispatchEvent(new Event('refreshChat'));
       }
     } else if (myEnrolls.length > 0) {
@@ -321,114 +336,254 @@ function initUserApp() {
     }
   }
 
-  // Comments
-  function loadMyComments() {
-    const comments = JSON.parse(localStorage.getItem('meal_comments')) || [];
-    const myCom = comments.filter(c => (c.projectId || c.project_id) === (curProj ? curProj.id : '') && (c.userId || c.user_id) === cur.id).sort((a,b) => b.time - a.time);
-    const con = document.getElementById('myCommentsContainer');
-    if (!con) return;
-    con.innerHTML = '';
-    
-    if(!myCom.length) {
-      con.innerHTML = '<p class="text-center text-muted py-4"><i class="fas fa-comment-slash" style="font-size:2rem; margin-bottom:.5rem; display:block; opacity:.4;"></i>এখনো কোনো মন্তব্য পাঠানো হয়নি।</p>';
-      return;
-    }
-    
-    myCom.forEach(c => {
-      const d = new Date(parseInt(c.time) || Date.now()).toLocaleString('bn-BD', { dateStyle: 'medium', timeStyle: 'short' });
-      const hasReply = c.reply && c.reply.trim().length > 0;
-      const rTime = (c.replyTime || c.reply_time) ? new Date(parseInt(c.replyTime || c.reply_time)).toLocaleString('bn-BD', { dateStyle: 'medium', timeStyle: 'short' }) : '';
-      
-      con.innerHTML += `
-        <div class="glass-panel" style="padding:1rem; border-color:rgba(79,142,247,0.25); position:relative; margin-bottom:0.75rem;">
-          <div class="flex items-center justify-between gap-2 mb-2 flex-wrap">
-            <div class="flex items-center gap-2">
-              <div class="comment-avatar" style="width:32px; height:32px; border-radius:50%; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.85rem;">${cur.name.charAt(0).toUpperCase()}</div>
-              <div>
-                <strong style="font-size:0.9rem;">${cur.name}</strong>
-                <span class="badge badge-blue" style="font-size:0.65rem; margin-left:4px;">You</span>
-              </div>
-            </div>
-            <div class="flex items-center gap-2">
-              <span style="font-size:0.75rem; color:var(--text-muted);"><i class="far fa-clock"></i> ${d}</span>
-              <button class="btn btn-danger btn-sm btn-del-my-com" data-id="${c.id}" title="মুছে ফেলুন" style="padding:.2rem .45rem; font-size:.75rem;"><i class="fas fa-trash"></i></button>
-            </div>
-          </div>
-          <div style="font-size:0.92rem; color:var(--text); line-height:1.5; white-space:pre-wrap; margin-bottom:${hasReply ? '.75rem' : '0'};">${c.text}</div>
-          ${hasReply ? `
-            <div style="background:rgba(34,197,94,0.08); border-left:3px solid #22c55e; border-radius:4px; padding:0.6rem 0.85rem; margin-top:0.5rem;">
-              <div class="flex items-center justify-between gap-2 mb-1 flex-wrap">
-                <span style="font-size:0.8rem; font-weight:700; color:#22c55e;"><i class="fas fa-reply"></i> ম্যানেজারের উত্তর:</span>
-                ${rTime ? `<span style="font-size:0.72rem; color:var(--text-muted);">${rTime}</span>` : ''}
-              </div>
-              <div style="font-size:0.88rem; color:var(--text); line-height:1.4;">${c.reply}</div>
-            </div>
-          ` : `
-            <div style="margin-top:0.4rem; font-size:0.75rem; color:var(--text-muted);">
-              <i class="fas fa-check-circle" style="color:var(--primary);"></i> ম্যানেজারের নিকট পৌঁছেছে
-            </div>
-          `}
-        </div>
-      `;
-    });
+  // ─── Bazaar / Market Expense Tracker for User ───
+  let _bazaarInited = false;
+  function initBazaarEvents() {
+    if (_bazaarInited) return;
+    _bazaarInited = true;
 
-    con.querySelectorAll('.btn-del-my-com').forEach(b => b.addEventListener('click', async e => {
-      if (!confirm('এই মন্তব্য মুছে ফেলবেন?')) return;
-      const cid = e.currentTarget.dataset.id;
+    const bMonth = document.getElementById('bazaarMonth');
+    if (bMonth) {
+      if (!bMonth.value) {
+        const tzOffset = (new Date()).getTimezoneOffset() * 60000;
+        bMonth.value = (new Date(Date.now() - tzOffset)).toISOString().slice(0, 7);
+      }
+      bMonth.addEventListener('change', () => loadBazaar());
+    }
+
+    const expDate = document.getElementById('expDate');
+    if (expDate && !expDate.value) {
+      const tzOffset = (new Date()).getTimezoneOffset() * 60000;
+      expDate.value = (new Date(Date.now() - tzOffset)).toISOString().slice(0, 10);
+    }
+
+    // Add expense
+    document.getElementById('addExpenseBtn')?.addEventListener('click', async () => {
+      if (!curProj) return showToast('প্রজেক্ট সিলেক্ট করা নেই', 'error');
+      const dateInp = document.getElementById('expDate');
+      const itemInp = document.getElementById('expItem');
+      const amountInp = document.getElementById('expAmount');
+      const catInp = document.getElementById('expCategory');
+      const noteInp = document.getElementById('expNote');
+
+      const date = dateInp?.value || (new Date()).toISOString().slice(0, 10);
+      const item = itemInp?.value.trim() || '';
+      const amount = parseFloat(amountInp?.value || 0);
+      const category = catInp?.value || 'bazaar';
+      const note = noteInp?.value.trim() || '';
+
+      if (!item) return showToast('পণ্যের নাম লিখুন', 'error');
+      if (amount <= 0) return showToast('সঠিক টাকার পরিমাণ লিখুন', 'error');
+
+      const btn = document.getElementById('addExpenseBtn');
+      const origText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> যোগ হচ্ছে...';
+
       try {
         if (window.API) {
-          await window.API.post('comments.php', { action: 'delete' }, { id: cid });
+          await window.API.post('expenses.php', { action: 'add' }, {
+            project_id: curProj.id,
+            user_id: cur.id,
+            date,
+            item,
+            amount,
+            category,
+            note
+          });
           await window.API.syncState();
         } else {
-          const comments = JSON.parse(localStorage.getItem('meal_comments')) || [];
-          localStorage.setItem('meal_comments', JSON.stringify(comments.filter(x => x.id !== cid)));
+          const expenses = JSON.parse(localStorage.getItem('meal_expenses')) || [];
+          expenses.unshift({
+            id: 'exp_' + Date.now(),
+            projectId: curProj.id,
+            userId: cur.id,
+            userName: cur.name,
+            date,
+            item,
+            amount,
+            category,
+            note
+          });
+          localStorage.setItem('meal_expenses', JSON.stringify(expenses));
         }
-        showToast('মন্তব্য মুছে ফেলা হয়েছে।');
-        loadMyComments();
+
+        if (itemInp) itemInp.value = '';
+        if (amountInp) amountInp.value = '';
+        if (noteInp) noteInp.value = '';
+        showToast('বাজার খরচ সফলভাবে যোগ করা হয়েছে! ✓');
+        loadBazaar();
       } catch (err) {
-        showToast(err.message || 'Error deleting comment', 'error');
+        showToast(err.message || 'Error adding expense', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = origText;
       }
-    }));
+    });
+
+    // Edit modal close / cancel
+    document.getElementById('closeEditExpModalBtn')?.addEventListener('click', () => {
+      document.getElementById('editExpModal')?.classList.remove('active');
+    });
+    document.getElementById('cancelEditExpBtn')?.addEventListener('click', () => {
+      document.getElementById('editExpModal')?.classList.remove('active');
+    });
+
+    // Edit save
+    document.getElementById('saveEditExpBtn')?.addEventListener('click', async () => {
+      const id = document.getElementById('editExpId')?.value;
+      const date = document.getElementById('editExpDate')?.value;
+      const item = document.getElementById('editExpItem')?.value.trim();
+      const amount = parseFloat(document.getElementById('editExpAmount')?.value || 0);
+      const category = document.getElementById('editExpCategory')?.value || 'bazaar';
+      const note = document.getElementById('editExpNote')?.value.trim() || '';
+
+      if (!id) return;
+      if (!item) return showToast('পণ্যের নাম লিখুন', 'error');
+      if (amount <= 0) return showToast('সঠিক টাকার পরিমাণ লিখুন', 'error');
+
+      const btn = document.getElementById('saveEditExpBtn');
+      const origText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> সেভ হচ্ছে...';
+
+      try {
+        if (window.API) {
+          await window.API.post('expenses.php', { action: 'update' }, {
+            id,
+            project_id: curProj.id,
+            date,
+            item,
+            amount,
+            category,
+            note
+          });
+          await window.API.syncState();
+        } else {
+          const expenses = JSON.parse(localStorage.getItem('meal_expenses')) || [];
+          const idx = expenses.findIndex(x => x.id === id);
+          if (idx > -1) {
+            expenses[idx] = { ...expenses[idx], date, item, amount, category, note };
+            localStorage.setItem('meal_expenses', JSON.stringify(expenses));
+          }
+        }
+        document.getElementById('editExpModal')?.classList.remove('active');
+        showToast('বাজার খরচের তথ্য সফলভাবে আপডেট হয়েছে! ✓');
+        loadBazaar();
+      } catch (err) {
+        showToast(err.message || 'Error updating expense', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = origText;
+      }
+    });
   }
 
-  document.getElementById('sendCommentBtn')?.addEventListener('click', async () => {
-    const inp = document.getElementById('commentInput');
-    const txt = inp.value.trim();
-    if(!txt) return showToast('মন্তব্য লিখুন', 'error');
-    if(!curProj) return showToast('কোনো প্রজেক্ট সিলেক্ট করা নেই', 'error');
+  function loadBazaar() {
+    if (!curProj) return;
+    initBazaarEvents();
 
-    const btn = document.getElementById('sendCommentBtn');
-    const origText = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> পাঠাচ্ছে...';
+    const bMonth = document.getElementById('bazaarMonth');
+    const monthStr = bMonth && bMonth.value ? bMonth.value : (new Date()).toISOString().slice(0, 7);
 
-    try {
-      if (window.API) {
-        await window.API.post('comments.php', { action: 'create' }, { project_id: curProj.id, user_id: cur.id, text: txt });
-        await window.API.syncState();
-      } else {
-        const comments = JSON.parse(localStorage.getItem('meal_comments')) || [];
-        const cObj = { id: Date.now().toString(), projectId: curProj.id, userId: cur.id, text: txt, time: Date.now() };
-        comments.unshift(cObj);
-        localStorage.setItem('meal_comments', JSON.stringify(comments));
+    const tzOffset = (new Date()).getTimezoneOffset() * 60000;
+    const todayStr = (new Date(Date.now() - tzOffset)).toISOString().slice(0, 10);
+
+    const expenses = JSON.parse(localStorage.getItem('meal_expenses')) || [];
+    const projExpenses = expenses.filter(x => (x.projectId || x.project_id) === curProj.id);
+    
+    // Month filter
+    const monthExpenses = projExpenses.filter(x => (x.date || '').slice(0, 7) === monthStr)
+                                      .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+    // Stats
+    const totalMonth = monthExpenses.reduce((sum, x) => sum + (parseFloat(x.amount) || 0), 0);
+    const totalToday = projExpenses.filter(x => x.date === todayStr).reduce((sum, x) => sum + (parseFloat(x.amount) || 0), 0);
+
+    const tmEl = document.getElementById('bazaarTotalMonth');
+    const ttEl = document.getElementById('bazaarTotalToday');
+    const teEl = document.getElementById('bazaarEntryCount');
+    if (tmEl) tmEl.textContent = totalMonth.toFixed(2) + ' ৳';
+    if (ttEl) ttEl.textContent = totalToday.toFixed(2) + ' ৳';
+    if (teEl) teEl.textContent = monthExpenses.length.toString();
+
+    const tbody = document.getElementById('bazaarBody');
+    if (!tbody) return;
+
+    if (!monthExpenses.length) {
+      tbody.innerHTML = `<tr><td colspan="7" class="text-center text-muted py-4"><i class="fas fa-shopping-basket" style="opacity:.4; font-size:2rem; display:block; margin-bottom:.5rem;"></i>${monthStr} মাসে কোনো বাজার খরচ এন্ট্রি পাওয়া যায়নি।</td></tr>`;
+      return;
+    }
+
+    const users = JSON.parse(localStorage.getItem('meal_users')) || [];
+
+    tbody.innerHTML = monthExpenses.map(exp => {
+      let adderName = exp.userName;
+      if (!adderName) {
+        const u = users.find(x => x.id === (exp.userId || exp.user_id));
+        adderName = u ? u.name : 'সদস্য';
       }
-      inp.value = '';
-      showToast('মন্তব্য সফলভাবে ম্যানেজারের কাছে পাঠানো হয়েছে! ✓');
-      loadMyComments();
-    } catch (err) {
-      showToast(err.message || 'মন্তব্য পাঠাতে সমস্যা হয়েছে', 'error');
-    } finally {
-      btn.disabled = false;
-      btn.innerHTML = origText;
-    }
-  });
+      if ((exp.userId || exp.user_id) === cur.id) {
+        adderName = `<strong>${adderName}</strong> <span class="badge badge-blue" style="font-size:0.65rem;">You</span>`;
+      }
 
-  document.getElementById('commentInput')?.addEventListener('keydown', e => {
-    if(e.key === 'Enter') {
-      e.preventDefault();
-      document.getElementById('sendCommentBtn')?.click();
-    }
-  });
+      const catBadge = exp.category === 'other'
+        ? '<span class="badge badge-yellow" style="font-size:0.75rem;">📦 অন্যান্য</span>'
+        : '<span class="badge badge-green" style="font-size:0.75rem;">🛒 বাজার</span>';
+
+      return `<tr>
+        <td style="white-space:nowrap;"><i class="far fa-calendar-alt text-muted" style="margin-right:4px;"></i>${exp.date}</td>
+        <td><strong>${exp.item}</strong></td>
+        <td class="tc">${catBadge}</td>
+        <td class="tc font-bold text-gradient">${parseFloat(exp.amount).toFixed(2)} ৳</td>
+        <td>${adderName}</td>
+        <td style="color:var(--text-muted); font-size:0.85rem;">${exp.note || '—'}</td>
+        <td class="tc" style="white-space:nowrap;">
+          <button class="btn btn-outline btn-sm btn-edit-exp" data-id="${exp.id}" title="সম্পাদনা করুন" style="padding:.25rem .5rem; font-size:.78rem; margin-right:4px;"><i class="fas fa-edit"></i></button>
+          <button class="btn btn-danger btn-sm btn-del-exp" data-id="${exp.id}" title="মুছে ফেলুন" style="padding:.25rem .5rem; font-size:.78rem;"><i class="fas fa-trash"></i></button>
+        </td>
+      </tr>`;
+    }).join('');
+
+    // Attach Edit and Delete listeners
+    tbody.querySelectorAll('.btn-edit-exp').forEach(btn => {
+      btn.addEventListener('click', e => {
+        const id = e.currentTarget.dataset.id;
+        const exp = projExpenses.find(x => x.id === id);
+        if (!exp) return;
+        document.getElementById('editExpId').value = exp.id;
+        document.getElementById('editExpDate').value = exp.date;
+        document.getElementById('editExpItem').value = exp.item;
+        document.getElementById('editExpAmount').value = exp.amount;
+        document.getElementById('editExpCategory').value = exp.category || 'bazaar';
+        document.getElementById('editExpNote').value = exp.note || '';
+        document.getElementById('editExpModal')?.classList.add('active');
+      });
+    });
+
+    tbody.querySelectorAll('.btn-del-exp').forEach(btn => {
+      btn.addEventListener('click', async e => {
+        const id = e.currentTarget.dataset.id;
+        if (!confirm('আপনি কি নিশ্চিত যে এই বাজার খরচের এন্ট্রি মুছে ফেলতে চান?')) return;
+        try {
+          if (window.API) {
+            await window.API.post('expenses.php', { action: 'delete' }, { id });
+            await window.API.syncState();
+          } else {
+            let expenses = JSON.parse(localStorage.getItem('meal_expenses')) || [];
+            expenses = expenses.filter(x => x.id !== id);
+            localStorage.setItem('meal_expenses', JSON.stringify(expenses));
+          }
+          showToast('বাজার খরচের এন্ট্রি মুছে ফেলা হয়েছে।');
+          loadBazaar();
+        } catch (err) {
+          showToast(err.message || 'Error deleting expense', 'error');
+        }
+      });
+    });
+  }
+
+  window.loadBazaar = loadBazaar;
 
   // Menu
   function loadMenu() {
@@ -568,6 +723,19 @@ function initUserApp() {
     if (monthEl && monthEl.value) {
       return monthEl.value;
     }
+    // Auto-detect latest saved bill month for this project
+    if (curProj) {
+      const bills = JSON.parse(localStorage.getItem('meal_bills')) || [];
+      const projBills = bills.filter(x => (x.projectId || x.project_id) === curProj.id)
+                             .sort((a, b) => (b.monthYear || b.month_year || '').localeCompare(a.monthYear || a.month_year || ''));
+      if (projBills.length > 0) {
+        const latestSavedMonth = projBills[0].monthYear || projBills[0].month_year;
+        if (latestSavedMonth) {
+          if (monthEl) monthEl.value = latestSavedMonth;
+          return latestSavedMonth;
+        }
+      }
+    }
     const tzOffset = (new Date()).getTimezoneOffset() * 60000;
     const defaultMonth = (new Date(Date.now() - tzOffset)).toISOString().slice(0, 7);
     if (monthEl) monthEl.value = defaultMonth;
@@ -662,9 +830,60 @@ function initUserApp() {
     const bBody = document.getElementById('userBillsBreakdownBody');
     if (bBody) {
       if (!b && grandTotal === 0) {
-        bBody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-4"><i class="fas fa-info-circle"></i> এই মাসের (${curMonthStr}) জন্য এখনো কোনো মাসিক বিল যুক্ত করা হয়নি।</td></tr>`;
+        bBody.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-4"><i class="fas fa-info-circle"></i> এই মাসের (${curMonthStr}) জন্য এখনো কোনো মাসিক বিল যুক্ত করা হয়নি। নিচে পূর্ববর্তী মাসের রেকর্ড দেখুন।</td></tr>`;
       } else {
         bBody.innerHTML = tableHtml;
+      }
+    }
+
+    // ─── Render All Months Bills History Table ───
+    const histBody = document.getElementById('userBillsHistoryBody');
+    if (histBody) {
+      const projBills = bills.filter(x => (x.projectId || x.project_id) === curProj.id)
+                             .sort((a, b) => (b.monthYear || b.month_year || '').localeCompare(a.monthYear || a.month_year || ''));
+      if (!projBills.length) {
+        histBody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-3">এখনো কোনো মাসিক বিল সেভ করা হয়নি।</td></tr>';
+      } else {
+        histBody.innerHTML = projBills.map(bRow => {
+          const mTotal = (parseFloat(bRow.houseRent || bRow.house_rent || 0) +
+            parseFloat(bRow.cookSalary || bRow.cook_salary || 0) +
+            parseFloat(bRow.wifiBill || bRow.wifi_bill || 0) +
+            parseFloat(bRow.gasBill || bRow.gas_bill || 0) +
+            parseFloat(bRow.electricityBill || bRow.electricity_bill || 0) +
+            parseFloat(bRow.garbageBill || bRow.garbage_bill || 0) +
+            parseFloat(bRow.otherBills || bRow.other_bills || 0));
+          const mShare = mTotal / memCount;
+          const rowMonth = bRow.monthYear || bRow.month_year;
+          const isSelected = rowMonth === curMonthStr;
+
+          return `<tr style="${isSelected ? 'background:rgba(79,142,247,0.12); font-weight:bold;' : ''}">
+            <td>
+              <button type="button" class="btn btn-outline btn-sm btn-select-bill-month" data-month="${rowMonth}" style="padding:.2rem .6rem; font-size:.78rem; cursor:pointer;">
+                <i class="far fa-calendar-alt"></i> ${rowMonth} ${isSelected ? '(চলতি)' : ''}
+              </button>
+            </td>
+            <td class="tc">${parseFloat(bRow.houseRent || bRow.house_rent || 0).toFixed(0)} ৳</td>
+            <td class="tc">${parseFloat(bRow.cookSalary || bRow.cook_salary || 0).toFixed(0)} ৳</td>
+            <td class="tc">${parseFloat(bRow.wifiBill || bRow.wifi_bill || 0).toFixed(0)} ৳</td>
+            <td class="tc">${parseFloat(bRow.gasBill || bRow.gas_bill || 0).toFixed(0)} ৳</td>
+            <td class="tc">${parseFloat(bRow.electricityBill || bRow.electricity_bill || 0).toFixed(0)} ৳</td>
+            <td class="tc">${parseFloat(bRow.garbageBill || bRow.garbage_bill || 0).toFixed(0)} ৳</td>
+            <td class="tc">${parseFloat(bRow.otherBills || bRow.other_bills || 0).toFixed(0)} ৳</td>
+            <td class="tc font-bold">${mTotal.toFixed(2)} ৳</td>
+            <td class="tc font-bold text-gradient">${mShare.toFixed(2)} ৳</td>
+          </tr>`;
+        }).join('');
+
+        histBody.querySelectorAll('.btn-select-bill-month').forEach(btn => {
+          btn.addEventListener('click', e => {
+            const m = e.currentTarget.dataset.month;
+            const mInp = document.getElementById('billsUserMonth');
+            if (mInp) {
+              mInp.value = m;
+              loadUserBills();
+            }
+          });
+        });
       }
     }
   }

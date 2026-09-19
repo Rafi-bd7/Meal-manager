@@ -27,7 +27,7 @@ if ($action === 'list') {
     jsonResponse(['notifications' => $stmt->fetchAll()]);
 }
 
-if ($action === 'create') {
+if ($action === 'create' || $action === 'send') {
     $data = getBody();
     $id = (string)time() . substr(md5(uniqid()), 0, 5);
     $projectId = $data['project_id'] ?? '';
@@ -40,7 +40,18 @@ if ($action === 'create') {
     $stmt = $db->prepare("INSERT INTO notifications (id, project_id, to_user, message, time) VALUES (?, ?, ?, ?, ?)");
     $stmt->execute([$id, $projectId, $to, $message, $time]);
 
-    jsonResponse(['success' => true]);
+    jsonResponse(['success' => true, 'id' => $id]);
+}
+
+if ($action === 'delete') {
+    $data = getBody();
+    $id = $data['id'] ?? '';
+    if (!$id) jsonResponse(['error' => 'Notification ID required.'], 400);
+
+    $stmt = $db->prepare("DELETE FROM notifications WHERE id = ?");
+    $stmt->execute([$id]);
+
+    jsonResponse(['success' => true, 'message' => 'Notification deleted.']);
 }
 
 jsonResponse(['error' => 'Invalid action.'], 400);

@@ -71,8 +71,8 @@ if ($action === 'state') {
     $chats = $db->query("SELECT id, project_id as projectId, user_id as userId, user_name as userName, text, time FROM chats ORDER BY time ASC")->fetchAll();
     $notifs = $db->query("SELECT id, project_id as projectId, to_user as `to`, message, time FROM notifications ORDER BY time DESC LIMIT 100")->fetchAll();
 
-    // New: Market Expenses
-    $expenses = $db->query("SELECT id, project_id as projectId, user_id as userId, date, item, amount, category, note FROM market_expenses ORDER BY date DESC, created_at DESC LIMIT 500")->fetchAll();
+    // Market Expenses
+    $expenses = $db->query("SELECT me.id, me.project_id as projectId, me.user_id as userId, u.name as userName, me.date, me.item, me.amount, me.category, me.note FROM market_expenses me LEFT JOIN users u ON me.user_id = u.id ORDER BY me.date DESC, me.created_at DESC LIMIT 500")->fetchAll();
     foreach ($expenses as &$ex) {
         $ex['amount'] = floatval($ex['amount']);
     }

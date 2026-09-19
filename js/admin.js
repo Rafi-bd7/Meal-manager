@@ -279,7 +279,6 @@ function initAdminApp() {
     loadMembers();
     calculateFinances();
     loadTracker();
-    loadComments();
     loadProfiles();
     if (typeof loadBazaar === 'function') loadBazaar();
     if (typeof loadBills === 'function') loadBills();
@@ -970,7 +969,7 @@ function initAdminApp() {
   const _todayStr = (new Date(Date.now() - _tzOffsetMs)).toISOString().slice(0, 10);
   const _curMonthStr = _todayStr.slice(0, 7);
 
-  // Init date/month pickers after DOM is ready
+  let _adminBazaarInited = false;
   function initExpenseControls() {
     const bm = document.getElementById('bazaarMonth');
     const bim = document.getElementById('billsMonth');
@@ -978,6 +977,66 @@ function initAdminApp() {
     if (bm && !bm._inited) { bm.value = _curMonthStr; bm.addEventListener('change', loadBazaar); bm._inited = true; }
     if (bim && !bim._inited) { bim.value = _curMonthStr; bim.addEventListener('change', loadBills); bim._inited = true; }
     if (ed && !ed.value) ed.value = _todayStr;
+
+    if (!_adminBazaarInited) {
+      _adminBazaarInited = true;
+      // Close edit modal
+      document.getElementById('closeEditExpModalBtn')?.addEventListener('click', () => {
+        document.getElementById('editExpModal')?.classList.remove('active');
+      });
+      document.getElementById('cancelEditExpBtn')?.addEventListener('click', () => {
+        document.getElementById('editExpModal')?.classList.remove('active');
+      });
+
+      // Save edit
+      document.getElementById('saveEditExpBtn')?.addEventListener('click', async () => {
+        const id = document.getElementById('editExpId')?.value;
+        const date = document.getElementById('editExpDate')?.value;
+        const item = document.getElementById('editExpItem')?.value.trim();
+        const amount = parseFloat(document.getElementById('editExpAmount')?.value || 0);
+        const category = document.getElementById('editExpCategory')?.value || 'bazaar';
+        const note = document.getElementById('editExpNote')?.value.trim() || '';
+
+        if (!id) return;
+        if (!item) return showToast('পণ্যের নাম লিখুন', 'error');
+        if (amount <= 0) return showToast('সঠিক টাকার পরিমাণ লিখুন', 'error');
+
+        const btn = document.getElementById('saveEditExpBtn');
+        const origText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> সেভ হচ্ছে...';
+
+        try {
+          if (window.API) {
+            await window.API.post('expenses.php', { action: 'update' }, {
+              id,
+              project_id: curProjId,
+              date,
+              item,
+              amount,
+              category,
+              note
+            });
+            await window.API.syncState();
+          } else {
+            const expenses = JSON.parse(localStorage.getItem('meal_expenses')) || [];
+            const idx = expenses.findIndex(x => x.id === id);
+            if (idx > -1) {
+              expenses[idx] = { ...expenses[idx], date, item, amount, category, note };
+              localStorage.setItem('meal_expenses', JSON.stringify(expenses));
+            }
+          }
+          document.getElementById('editExpModal')?.classList.remove('active');
+          showToast('বাজার খরচের তথ্য সফলভাবে আপডেট হয়েছে! ✓');
+          loadBazaar();
+        } catch (err) {
+          showToast(err.message || 'Error updating expense', 'error');
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML = origText;
+        }
+      });
+    }
   }
   initExpenseControls();
 
@@ -1010,19 +1069,27 @@ function initAdminApp() {
     if (!body) return;
     body.innerHTML = '';
     if (!filtered.length) {
-      body.innerHTML = '<tr><td colspan="6" class="text-center text-muted" style="padding:2rem;">এই মাসে কোনো বাজার খরচের এন্ট্রি নেই।</td></tr>';
+      body.innerHTML = '<tr><td colspan="7" class="text-center text-muted" style="padding:2rem;">এই মাসে কোনো বাজার খরচের এন্ট্রি নেই।</td></tr>';
     } else {
       // Sort by date desc
       [...filtered].sort((a, b) => b.date.localeCompare(a.date)).forEach(ex => {
         const u = users.find(x => x.id === (ex.userId || ex.user_id));
+        let adderName = ex.userName || (u ? u.name : 'মেম্বার');
+        if ((ex.userId || ex.user_id) === cur.id) {
+          adderName = `<strong>${adderName}</strong> <span class="badge badge-blue" style="font-size:0.65rem;">You</span>`;
+        }
         const catIcon = ex.category === 'bazaar' ? '🛒' : '📦';
         body.innerHTML += `<tr>
-          <td><strong>${ex.date}</strong></td>
-          <td>${ex.item}</td>
-          <td class="tc"><span class="badge badge-blue">${catIcon} ${ex.category === 'bazaar' ? 'বাজার' : 'অন্য'}</span></td>
+          <td style="white-space:nowrap;"><i class="far fa-calendar-alt text-muted" style="margin-right:4px;"></i>${ex.date}</td>
+          <td><strong>${ex.item}</strong></td>
+          <td class="tc"><span class="badge badge-blue">${catIcon} ${ex.category === 'bazaar' ? 'বাজার' : 'অন্যান্য'}</span></td>
           <td class="tc font-bold text-gradient">${parseFloat(ex.amount).toFixed(2)} ৳</td>
+          <td>${adderName}</td>
           <td style="font-size:.82rem; color:var(--text-muted);">${ex.note || '—'}</td>
-          <td class="tc"><button class="btn btn-danger btn-sm btn-del-expense" data-id="${ex.id}" style="padding:.25rem .5rem;"><i class="fas fa-trash"></i></button></td>
+          <td class="tc" style="white-space:nowrap;">
+            <button class="btn btn-outline btn-sm btn-edit-exp" data-id="${ex.id}" title="সম্পাদনা করুন" style="padding:.25rem .5rem; font-size:.78rem; margin-right:4px;"><i class="fas fa-edit"></i></button>
+            <button class="btn btn-danger btn-sm btn-del-expense" data-id="${ex.id}" title="মুছে ফেলুন" style="padding:.25rem .5rem; font-size:.78rem;"><i class="fas fa-trash"></i></button>
+          </td>
         </tr>`;
       });
     }
@@ -1037,6 +1104,20 @@ function initAdminApp() {
         sortedDays.map(d => `<div class="glass-panel" style="padding:.5rem .85rem; font-size:.82rem; border-color:rgba(79,142,247,.3); text-align:center;"><strong style="color:var(--primary);">${d}</strong><br><span class="text-gradient font-bold">${byDay[d].toFixed(0)} ৳</span></div>`).join('')
       }</div>`;
     } else if (dailyDiv) { dailyDiv.innerHTML = ''; }
+
+    // Edit expense event
+    body.querySelectorAll('.btn-edit-exp').forEach(btn => btn.addEventListener('click', e => {
+      const eid = e.currentTarget.dataset.id;
+      const ex = filtered.find(x => x.id === eid);
+      if (!ex) return;
+      document.getElementById('editExpId').value = ex.id;
+      document.getElementById('editExpDate').value = ex.date;
+      document.getElementById('editExpItem').value = ex.item;
+      document.getElementById('editExpAmount').value = ex.amount;
+      document.getElementById('editExpCategory').value = ex.category || 'bazaar';
+      document.getElementById('editExpNote').value = ex.note || '';
+      document.getElementById('editExpModal')?.classList.add('active');
+    }));
 
     // Delete expense event
     body.querySelectorAll('.btn-del-expense').forEach(btn => btn.addEventListener('click', async e => {
@@ -1077,13 +1158,13 @@ function initAdminApp() {
         await window.API.syncState();
       } else {
         const exps = JSON.parse(localStorage.getItem('meal_expenses')) || [];
-        exps.push({ id: 'exp_' + Date.now(), projectId: curProjId, userId: cur.id, date, item, amount, category: cat, note });
+        exps.push({ id: 'exp_' + Date.now(), projectId: curProjId, userId: cur.id, userName: cur.name, date, item, amount, category: cat, note });
         localStorage.setItem('meal_expenses', JSON.stringify(exps));
       }
       document.getElementById('expItem').value = '';
       document.getElementById('expAmount').value = '';
       document.getElementById('expNote').value = '';
-      showToast('খরচ যোগ করা হয়েছে! 🛒');
+      showToast('খরচ সফলভাবে যোগ করা হয়েছে! 🛒');
       loadBazaar();
     } catch (err) { showToast(err.message || 'Error adding expense', 'error'); }
   });
@@ -1353,6 +1434,12 @@ function initAdminApp() {
     try {
       if (window.API) {
         await window.API.post('bills.php', { action: 'save' }, payload);
+        // Automatically dispatch a notification to all members of this project
+        await window.API.post('notifications.php', { action: 'create' }, {
+          project_id: curProjId,
+          to: 'all',
+          message: `${month} মাসের মেস বিলের হিসাব আপডেট করা হয়েছে। আপনার ড্যাশবোর্ডে গিয়ে প্রদেয় অংশ চেক করুন।`
+        }).catch(() => {});
         await window.API.syncState();
       }
       showToast('মাসিক বিল ও সকল খাতের হিসাব সফলভাবে সেভ করা হয়েছে! ✓');
@@ -1471,13 +1558,38 @@ function initAdminApp() {
     list.innerHTML = projNotifs.map(n => {
       const dStr = n.time ? new Date(parseInt(n.time)).toLocaleString('bn-BD', { dateStyle:'medium', timeStyle:'short' }) : '';
       return `<div class="card p-3" style="background:var(--card-bg); border-radius:0.75rem; border:1px solid var(--glass-border);">
-        <div class="flex justify-between items-center mb-1">
+        <div class="flex justify-between items-center mb-2 flex-wrap gap-2">
           <span class="badge badge-blue"><i class="fas fa-bullhorn"></i> ঘোষণা</span>
-          <span class="text-muted" style="font-size:0.75rem;">${dStr}</span>
+          <div class="flex items-center gap-2">
+            <span class="text-muted" style="font-size:0.75rem;">${dStr}</span>
+            <button type="button" class="btn btn-danger btn-sm btn-del-notice" data-id="${n.id}" title="নোটিশ মুছে ফেলুন" style="padding:.2rem .55rem; font-size:.75rem;">
+              <i class="fas fa-trash"></i> মুছুন
+            </button>
+          </div>
         </div>
         <p style="margin:0; font-size:0.95rem; line-height:1.5;">${n.message}</p>
       </div>`;
     }).join('');
+
+    list.querySelectorAll('.btn-del-notice').forEach(btn => {
+      btn.addEventListener('click', async e => {
+        const id = e.currentTarget.dataset.id;
+        if (!confirm('আপনি কি এই নোটিশটি স্থায়ীভাবে মুছে ফেলতে চান?')) return;
+        try {
+          if (window.API) {
+            await window.API.post('notifications.php', { action: 'delete' }, { id });
+            await window.API.syncState();
+          } else {
+            const notifs = JSON.parse(localStorage.getItem('meal_notifications')) || [];
+            localStorage.setItem('meal_notifications', JSON.stringify(notifs.filter(x => x.id !== id)));
+          }
+          showToast('নোটিশ সফলভাবে মুছে ফেলা হয়েছে।');
+          loadNotices();
+        } catch (err) {
+          showToast(err.message || 'Error deleting notice', 'error');
+        }
+      });
+    });
   }
 
   document.getElementById('sendNoticeBtn')?.addEventListener('click', async () => {
