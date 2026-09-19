@@ -4,7 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Dashboard — MealManager</title>
-  <link rel="stylesheet" href="css/styles.css?v=4">
+  <meta name="description" content="Admin control panel for MealManager - manage meals, finances, expenses and members.">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#4f8ef7">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="css/styles.css?v=5">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
@@ -89,12 +93,15 @@
       </div>
 
       <!-- Tabs -->
-      <div class="tabs">
+      <div class="tabs" style="flex-wrap:wrap;">
         <button class="tab-btn active" data-tab="tracker"><i class="fas fa-calendar-alt"></i> Daily Tracker</button>
         <button class="tab-btn" data-tab="finances"><i class="fas fa-file-invoice-dollar"></i> Finances</button>
+        <button class="tab-btn" data-tab="bazaar"><i class="fas fa-shopping-basket"></i> বাজার খরচ</button>
+        <button class="tab-btn" data-tab="bills"><i class="fas fa-file-invoice"></i> মাসিক বিল</button>
         <button class="tab-btn" data-tab="comments"><i class="fas fa-comments"></i> Comments <span id="commentBadge" class="badge badge-blue" style="font-size:.65rem;"></span></button>
         <button class="tab-btn" data-tab="menu"><i class="fas fa-list-ul"></i> Weekly Menu</button>
         <button class="tab-btn" data-tab="members"><i class="fas fa-users"></i> Members</button>
+        <button class="tab-btn" data-tab="notices"><i class="fas fa-bullhorn"></i> নোটিশ ও ঘোষণা</button>
         <button class="tab-btn" data-tab="profiles"><i class="fas fa-id-badge"></i> Profiles</button>
       </div>
 
@@ -149,6 +156,253 @@
               </thead>
               <tbody id="financeBody"></tbody>
             </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <!-- Tab: বাজার খরচ (Daily Market & Expense Tracker)          -->
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <div id="tab-bazaar" class="tab-content glass-panel">
+        <div class="flex items-center justify-between flex-wrap gap-3 mb-3">
+          <h3 style="font-size:1.05rem; margin:0;"><i class="fas fa-shopping-basket" style="color:var(--accent);"></i> দৈনিক বাজার ও খরচ ট্র্যাকার</h3>
+          <input type="month" id="bazaarMonth" class="form-control" style="width:auto; padding:.5rem .85rem;">
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="grid-3 mb-3" id="bazaarSummaryCards">
+          <div class="stat-card card-3d">
+            <div class="stat-label"><i class="fas fa-shopping-cart"></i> মাসের মোট বাজার</div>
+            <div class="stat-value" id="bazaarTotalMonth">0 ৳</div>
+            <i class="fas fa-store stat-icon"></i>
+          </div>
+          <div class="stat-card card-3d">
+            <div class="stat-label"><i class="fas fa-calendar-day"></i> আজকের বাজার</div>
+            <div class="stat-value" id="bazaarTotalToday">0 ৳</div>
+            <i class="fas fa-calendar stat-icon"></i>
+          </div>
+          <div class="stat-card card-3d">
+            <div class="stat-label"><i class="fas fa-list-ol"></i> মোট এন্ট্রি</div>
+            <div class="stat-value" id="bazaarEntryCount">0</div>
+            <i class="fas fa-receipt stat-icon"></i>
+          </div>
+        </div>
+
+        <!-- Add Expense Form -->
+        <div class="glass-panel mb-3 fade-in" style="border-color:rgba(79,142,247,.3); padding:1.25rem;">
+          <h4 style="font-size:.95rem; margin-bottom:1rem; font-weight:700;"><i class="fas fa-plus-circle" style="color:var(--primary);"></i> নতুন খরচ যোগ করুন</h4>
+          <div class="flex gap-3 flex-wrap">
+            <input type="date" id="expDate" class="form-control" style="min-width:140px; flex:0 0 auto;">
+            <input type="text" id="expItem" class="form-control" placeholder="পণ্যের নাম (e.g. চাল, ডাল, তেল...)" style="flex:2; min-width:180px;">
+            <input type="number" id="expAmount" class="form-control" placeholder="টাকার পরিমাণ" min="1" style="flex:1; min-width:130px;">
+            <select id="expCategory" class="form-control" style="flex:0 0 auto; min-width:130px;">
+              <option value="bazaar">🛒 বাজার</option>
+              <option value="other">📦 অন্যান্য</option>
+            </select>
+            <input type="text" id="expNote" class="form-control" placeholder="নোট (ঐচ্ছিক)" style="flex:1; min-width:150px;">
+            <button id="addExpenseBtn" class="btn btn-primary"><i class="fas fa-plus"></i> যোগ করুন</button>
+          </div>
+        </div>
+
+        <!-- Expense Table -->
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>তারিখ</th>
+                <th>পণ্য</th>
+                <th class="tc">ধরন</th>
+                <th class="tc">টাকা (৳)</th>
+                <th>নোট</th>
+                <th class="tc">মুছুন</th>
+              </tr>
+            </thead>
+            <tbody id="bazaarBody"></tbody>
+          </table>
+        </div>
+
+        <!-- Daily Total Bar -->
+        <div id="bazaarDailyTotals" class="mt-3"></div>
+      </div>
+
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <!-- Tab: মাসিক বিল (Monthly Fixed Bills)                      -->
+      <!-- ══════════════════════════════════════════════════════════ -->
+      <div id="tab-bills" class="tab-content glass-panel">
+        <div class="flex items-center justify-between flex-wrap gap-3 mb-3">
+          <h3 style="font-size:1.05rem; margin:0;"><i class="fas fa-file-invoice" style="color:var(--warning);"></i> মাসিক নির্দিষ্ট খরচ ও বিল</h3>
+          <input type="month" id="billsMonth" class="form-control" style="width:auto; padding:.5rem .85rem;">
+        </div>
+
+        <!-- Bill Summary Stats -->
+        <div class="grid-3 mb-3">
+          <div class="stat-card card-3d" style="border-color:rgba(255,193,7,.3);">
+            <div class="stat-label"><i class="fas fa-home"></i> মোট মেস বিল</div>
+            <div class="stat-value" id="billsGrandTotal">0 ৳</div>
+            <i class="fas fa-receipt stat-icon"></i>
+          </div>
+          <div class="stat-card card-3d" style="border-color:rgba(79,142,247,.3);">
+            <div class="stat-label"><i class="fas fa-user-friends"></i> মোট সদস্য</div>
+            <div class="stat-value" id="billsMemberCount">0 জন</div>
+            <i class="fas fa-users stat-icon"></i>
+          </div>
+          <div class="stat-card card-3d" style="border-color:rgba(52,211,153,.3);">
+            <div class="stat-label"><i class="fas fa-calculator"></i> সর্বমোট মাথাপিছু</div>
+            <div class="stat-value text-gradient font-bold" id="billsPerMember">0 ৳</div>
+            <i class="fas fa-divide stat-icon"></i>
+          </div>
+        </div>
+
+        <!-- Bill Input Form -->
+        <div class="bills-grid">
+          <div class="bill-item-card">
+            <div class="bill-item-icon" style="background:rgba(79,142,247,.15); color:#4f8ef7;"><i class="fas fa-home"></i></div>
+            <div class="bill-item-info">
+              <label class="bill-item-label">🏠 বাড়ি ভাড়া (House Rent)</label>
+              <input type="number" id="billHouseRent" class="form-control bill-input" placeholder="0" min="0">
+              <div class="bill-per-head" id="perHead_billHouseRent" style="font-size:0.8rem; color:var(--primary); font-weight:600;">মাথাপিছু: 0 ৳</div>
+            </div>
+          </div>
+          <div class="bill-item-card">
+            <div class="bill-item-icon" style="background:rgba(168,85,247,.15); color:#a855f7;"><i class="fas fa-user-nurse"></i></div>
+            <div class="bill-item-info">
+              <label class="bill-item-label">👩‍🍳 রান্নার বুয়া/খালার বেতন (Cook Salary)</label>
+              <input type="number" id="billCookSalary" class="form-control bill-input" placeholder="0" min="0">
+              <div class="bill-per-head" id="perHead_billCookSalary" style="font-size:0.8rem; color:var(--primary); font-weight:600;">মাথাপিছু: 0 ৳</div>
+            </div>
+          </div>
+          <div class="bill-item-card">
+            <div class="bill-item-icon" style="background:rgba(6,182,212,.15); color:#06b6d4;"><i class="fas fa-wifi"></i></div>
+            <div class="bill-item-info">
+              <label class="bill-item-label">📶 ওয়াই-ফাই (Wi-Fi Bill)</label>
+              <input type="number" id="billWifi" class="form-control bill-input" placeholder="0" min="0">
+              <div class="bill-per-head" id="perHead_billWifi" style="font-size:0.8rem; color:var(--primary); font-weight:600;">মাথাপিছু: 0 ৳</div>
+            </div>
+          </div>
+          <div class="bill-item-card">
+            <div class="bill-item-icon" style="background:rgba(249,115,22,.15); color:#f97316;"><i class="fas fa-fire"></i></div>
+            <div class="bill-item-info">
+              <label class="bill-item-label">🔥 গ্যাস বিল (Gas Bill)</label>
+              <input type="number" id="billGas" class="form-control bill-input" placeholder="0" min="0">
+              <div class="bill-per-head" id="perHead_billGas" style="font-size:0.8rem; color:var(--primary); font-weight:600;">মাথাপিছু: 0 ৳</div>
+            </div>
+          </div>
+          <div class="bill-item-card">
+            <div class="bill-item-icon" style="background:rgba(234,179,8,.15); color:#eab308;"><i class="fas fa-bolt"></i></div>
+            <div class="bill-item-info">
+              <label class="bill-item-label">⚡ বিদ্যুৎ বিল (Electricity Bill)</label>
+              <input type="number" id="billElectricity" class="form-control bill-input" placeholder="0" min="0">
+              <div class="bill-per-head" id="perHead_billElectricity" style="font-size:0.8rem; color:var(--primary); font-weight:600;">মাথাপিছু: 0 ৳</div>
+            </div>
+          </div>
+          <div class="bill-item-card">
+            <div class="bill-item-icon" style="background:rgba(34,197,94,.15); color:#22c55e;"><i class="fas fa-trash-alt"></i></div>
+            <div class="bill-item-info">
+              <label class="bill-item-label">🗑️ ময়লার বিল (Garbage Bill)</label>
+              <input type="number" id="billGarbage" class="form-control bill-input" placeholder="0" min="0">
+              <div class="bill-per-head" id="perHead_billGarbage" style="font-size:0.8rem; color:var(--primary); font-weight:600;">মাথাপিছু: 0 ৳</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Custom / Additional Bills Section -->
+        <div class="card p-3 mt-3" style="background:var(--card-bg); border-radius:var(--radius); border:1px solid var(--glass-border); padding:1.25rem;">
+          <div class="flex justify-between items-center mb-2 flex-wrap gap-2">
+            <h4 style="font-size:0.95rem; margin:0; font-weight:700;"><i class="fas fa-plus-circle" style="color:var(--accent);"></i> অন্যান্য নির্দিষ্ট বিলসমূহ (Custom Bills)</h4>
+            <button type="button" id="addCustomBillBtn" class="btn btn-outline btn-sm">
+              <i class="fas fa-plus"></i> নতুন বিল যোগ করুন (যেমন: পানির বিল, সার্ভিস চার্জ)
+            </button>
+          </div>
+          <p class="text-muted" style="font-size:0.8rem; margin-bottom:0.75rem;">এখানে আপনি নিজের প্রয়োজন মতো পানির বিল, সার্ভিস চার্জ, সিকিউরিটি বিল ইত্যাদি যেকোনো বিল যোগ করতে পারেন।</p>
+          <div id="customBillsContainer" style="display:flex; flex-direction:column; gap:0.6rem;"></div>
+        </div>
+
+        <div class="flex gap-3 mt-3 flex-wrap items-center">
+          <button id="saveBillsBtn" class="btn btn-primary" style="padding:.85rem 2rem;"><i class="fas fa-save"></i> মাসিক বিল সেভ করুন</button>
+          <button id="downloadBillsPdfBtn" class="btn btn-outline" style="padding:.85rem 1.5rem;"><i class="fas fa-file-pdf" style="color:#ef4444;"></i> বিলের PDF রসিদ ডাউনলোড</button>
+          <div class="glass-panel" style="padding:.75rem 1.25rem; border-color:rgba(255,193,7,.3); flex:1; min-width:200px;">
+            <p style="margin:0; font-size:.85rem; color:var(--text-muted);">মোট বিল: <strong id="billsTotalLive" style="color:var(--warning); font-size:1.1rem;">0 ৳</strong></p>
+            <p style="margin:.25rem 0 0; font-size:.78rem; color:var(--text-muted);"><span id="billsSavedStatus">সেভ হয়নি</span></p>
+          </div>
+        </div>
+
+        <!-- Itemized Breakdown Table -->
+        <div class="mt-4">
+          <h4 style="font-size:.95rem; font-weight:700; margin-bottom:1rem;"><i class="fas fa-list-alt" style="color:var(--primary);"></i> চলতি মাসের খাতওয়ারি মাথাপিছু হিসাব</h4>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>বিলের খাত (Expense Head)</th>
+                  <th class="tc">মোট টাকা (৳)</th>
+                  <th class="tc">সদস্য সংখ্যা</th>
+                  <th class="tc" style="color:var(--accent);">মাথাপিছু অংশ (৳)</th>
+                </tr>
+              </thead>
+              <tbody id="billsBreakdownBody">
+                <tr><td colspan="4" class="text-center text-muted py-3">বিল লোড হচ্ছে...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Bills History Table -->
+        <div class="mt-4">
+          <h4 style="font-size:.95rem; font-weight:700; margin-bottom:1rem;"><i class="fas fa-history" style="color:var(--primary);"></i> বিলের ইতিহাস</h4>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>মাস</th>
+                  <th class="tc">বাড়ি ভাড়া</th>
+                  <th class="tc">বুয়ার বেতন</th>
+                  <th class="tc">WiFi</th>
+                  <th class="tc">গ্যাস</th>
+                  <th class="tc">বিদ্যুৎ</th>
+                  <th class="tc">ময়লা</th>
+                  <th class="tc">অন্যান্য</th>
+                  <th class="tc">মোট</th>
+                </tr>
+              </thead>
+              <tbody id="billsHistoryBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Printable PDF Container for Bills (Hidden) -->
+        <div id="billsPdfArea" style="display:none; background:#ffffff; color:#0f172a; padding:30px; font-family:'Inter', sans-serif;">
+          <div style="border-bottom:3px solid #4f8ef7; padding-bottom:15px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <h1 style="margin:0; font-size:1.8rem; font-weight:800; color:#4f8ef7;">MealManager</h1>
+              <p style="margin:4px 0 0; font-size:0.95rem; color:#64748b;">মাসিক নির্দিষ্ট খরচের রসিদ (Monthly Bills Invoice)</p>
+            </div>
+            <div style="text-align:right;">
+              <h3 style="margin:0; font-size:1.15rem; color:#0f172a;" id="pdfProjNameBills"></h3>
+              <p style="margin:4px 0 0; font-size:0.9rem; color:#64748b;">মাস: <strong id="pdfMonthBills" style="color:#0f172a;"></strong></p>
+            </div>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:15px 20px; margin-bottom:20px;">
+            <div><span style="font-size:0.85rem; color:#64748b;">মোট মেস বিল:</span> <br><strong style="font-size:1.3rem; color:#0f172a;" id="pdfGrandTotalBills">0 ৳</strong></div>
+            <div><span style="font-size:0.85rem; color:#64748b;">মোট মেম্বার:</span> <br><strong style="font-size:1.3rem; color:#0f172a;" id="pdfMemCountBills">0 জন</strong></div>
+            <div><span style="font-size:0.85rem; color:#64748b;">মাথাপিছু প্রদেয় বিল:</span> <br><strong style="font-size:1.3rem; color:#2563eb;" id="pdfPerHeadBills">0 ৳</strong></div>
+          </div>
+
+          <table style="width:100%; border-collapse:collapse; margin-bottom:25px;">
+            <thead>
+              <tr style="background:#f1f5f9; border-bottom:2px solid #cbd5e1;">
+                <th style="padding:10px; text-align:left; font-size:0.9rem; color:#334155;">বিলের বিবরণ</th>
+                <th style="padding:10px; text-align:center; font-size:0.9rem; color:#334155;">মোট টাকা (৳)</th>
+                <th style="padding:10px; text-align:center; font-size:0.9rem; color:#334155;">মেম্বার সংখ্যা</th>
+                <th style="padding:10px; text-align:right; font-size:0.9rem; color:#334155;">মাথাপিছু অংশ (৳)</th>
+              </tr>
+            </thead>
+            <tbody id="pdfBillsTableBody"></tbody>
+          </table>
+
+          <div style="border-top:1px dashed #cbd5e1; padding-top:15px; display:flex; justify-content:space-between; font-size:0.8rem; color:#94a3b8;">
+            <span>Generated by MealManager App</span>
+            <span id="pdfPrintDate"></span>
           </div>
         </div>
       </div>
@@ -224,16 +478,51 @@
         <h3 style="font-size:1.05rem; margin-bottom:1rem;"><i class="fas fa-users" style="color:var(--primary);"></i> All Members</h3>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Photo</th><th>Name</th><th>Email</th><th>Password</th></tr></thead>
+            <thead><tr><th>Photo</th><th>Name</th><th>Email</th><th>Role</th></tr></thead>
             <tbody id="profilesBody"></tbody>
           </table>
+        </div>
+      </div>
+
+      <!-- Tab: নোটিশ ও ঘোষণা (Announcements & Push Notifications) -->
+      <div id="tab-notices" class="tab-content glass-panel">
+        <div class="flex items-center justify-between flex-wrap gap-3 mb-3">
+          <h3 style="font-size:1.05rem; margin:0;">
+            <i class="fas fa-bullhorn" style="color:var(--primary);"></i> নতুন ঘোষণা ও নোটিশ পাঠান
+          </h3>
+          <span class="badge badge-blue"><i class="fas fa-bell"></i> মেম্বারদের ফোনে নোটিফিকেশন যাবে</span>
+        </div>
+        <div class="card p-3 mb-4" style="background:var(--card-bg); border-radius:var(--radius); border:1px solid var(--glass-border); padding:1.25rem;">
+          <div class="form-group mb-3">
+            <label class="form-label" style="font-weight:600; margin-bottom:0.5rem;"><i class="fas fa-edit"></i> নোটিশের বিবরণ (Announcement Text)</label>
+            <textarea id="noticeMessageInput" class="form-control" rows="3" placeholder="যেমন: আজকের রাতের মিল সন্ধ্যা ৬টার মধ্যে কনফার্ম করতে হবে... অথবা চলতি মাসের টাকা জমা দিন..."></textarea>
+          </div>
+          <div class="flex justify-between items-center flex-wrap gap-2">
+            <button id="sendNoticeBtn" class="btn btn-primary" style="padding:0.6rem 1.5rem;">
+              <i class="fas fa-paper-plane"></i> ঘোষণা পাঠান (Send Notification)
+            </button>
+            <button id="testNotifyBtn" class="btn btn-outline btn-sm">
+              <i class="fas fa-bell"></i> নোটিফিকেশন পারমিশন অন করুন
+            </button>
+          </div>
+        </div>
+
+        <h4 style="font-size:0.95rem; margin-top:1.5rem; margin-bottom:0.75rem;"><i class="fas fa-history"></i> পূর্ববর্তী নোটিশসমূহ</h4>
+        <div id="noticesHistoryList" style="display:flex; flex-direction:column; gap:0.75rem;">
+          <p class="text-muted text-center py-3">কোনো নোটিশ পাঠানো হয়নি।</p>
         </div>
       </div>
     </div>
   </div>
 
-  <script type="module" src="js/firebase-sync.js?v=5"></script>
-  <script src="js/chat.js?v=5"></script>
-  <script src="js/admin.js?v=5"></script>
+  <script src="js/api.js"></script>
+  <script src="js/chat.js"></script>
+  <script src="js/admin.js"></script>
+  <script>
+    // PWA Service Worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+  </script>
 </body>
 </html>

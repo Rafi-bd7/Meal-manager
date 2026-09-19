@@ -189,7 +189,7 @@
   }
 
   // ---------- Send ----------
-  function send(curUser, getProjId) {
+  async function send(curUser, getProjId) {
     const text = inp.value.trim();
     const pid  = getProjId();
     if (!text || !pid) return;
@@ -203,9 +203,22 @@
     };
     chats.push(msg);
     localStorage.setItem('meal_chats', JSON.stringify(chats));
-    if (window.fbCreate) window.fbCreate('meal_chats', msg.id, msg);
     inp.value = '';
     renderChat(curUser, pid);
+
+    try {
+      if (window.API) {
+        await window.API.post('chats.php', { action: 'send' }, {
+          project_id: pid,
+          user_id: curUser.id,
+          user_name: curUser.name,
+          text,
+          time: msg.time
+        });
+      }
+    } catch (e) {
+      console.warn('Chat send error:', e);
+    }
     setTimeout(() => { msgs.scrollTop = msgs.scrollHeight; }, 50);
   }
 

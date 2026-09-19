@@ -1,0 +1,11 @@
+{
+  "name": "meal-manager",
+  "version": "1.0.0",
+  "description": "Meal Manager frontend",
+  "scripts": {
+    "start": "serve ."
+  },
+  "dependencies": {
+    "serve": "^14.2.4"
+  }
+}

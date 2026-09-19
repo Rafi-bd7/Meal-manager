@@ -1,6 +1,5 @@
 // ─── Theme & Toast Helpers ────────────────────────────────────────────────────
 (function () {
-  // Set Light Mode as default if no theme is saved
   const saved = localStorage.getItem('mm_theme') || 'light';
   document.documentElement.setAttribute('data-theme', saved);
   
@@ -59,37 +58,58 @@ function initAuthApp() {
   });
 
   // Register
-  document.getElementById('regBtn')?.addEventListener('click', () => {
+  document.getElementById('regBtn')?.addEventListener('click', async () => {
     const name     = document.getElementById('regName').value.trim();
     const email    = document.getElementById('regEmail').value.trim().toLowerCase();
     const password = document.getElementById('regPassword').value;
     const role     = document.getElementById('regRole').value;
     if (!name || !email || !password) return showToast('Please fill all fields', 'error');
 
-    const users = JSON.parse(localStorage.getItem('meal_users'));
-    if (users.find(u => u.email === email)) return showToast('Email already registered!', 'error');
-
-    const newUser = { id: Date.now().toString(), name, email, password, role };
-    users.push(newUser);
-    localStorage.setItem('meal_users', JSON.stringify(users));
-    if (window.fbCreate) window.fbCreate('meal_users', newUser.id, newUser);
-    showToast('Registration successful! Please login.');
-    document.getElementById('showLogin').click();
+    try {
+      if (window.API) {
+        const res = await window.API.post('auth.php', { action: 'register' }, { name, email, password, role });
+        showToast(res.message || 'Registration successful! Please login.');
+      } else {
+        const users = JSON.parse(localStorage.getItem('meal_users'));
+        if (users.find(u => u.email === email)) return showToast('Email already registered!', 'error');
+        const newUser = { id: Date.now().toString(), name, email, password, role };
+        users.push(newUser);
+        localStorage.setItem('meal_users', JSON.stringify(users));
+        showToast('Registration successful! Please login.');
+      }
+      document.getElementById('showLogin').click();
+    } catch (err) {
+      showToast(err.message || 'Registration failed!', 'error');
+    }
   });
 
   // Login
-  document.getElementById('loginBtn')?.addEventListener('click', () => {
+  document.getElementById('loginBtn')?.addEventListener('click', async () => {
     const email    = document.getElementById('loginEmail').value.trim().toLowerCase();
     const password = document.getElementById('loginPassword').value;
-    const users    = JSON.parse(localStorage.getItem('meal_users'));
-    const user     = users.find(u => u.email === email && u.password === password);
+    if (!email || !password) return showToast('Please fill all fields', 'error');
 
-    if (!user) return showToast('Invalid email or password', 'error');
-    localStorage.setItem('meal_currentUser', JSON.stringify(user));
-    showToast('Login successful!');
-    setTimeout(() => {
-      window.location.href = user.role === 'admin' ? 'admin-dashboard.html' : 'user-dashboard.html';
-    }, 600);
+    try {
+      if (window.API) {
+        const res = await window.API.post('auth.php', { action: 'login' }, { email, password });
+        localStorage.setItem('meal_currentUser', JSON.stringify(res.user));
+        showToast('Login successful!');
+        setTimeout(() => {
+          window.location.href = res.user.role === 'admin' ? 'admin-dashboard.html' : 'user-dashboard.html';
+        }, 500);
+      } else {
+        const users = JSON.parse(localStorage.getItem('meal_users'));
+        const user  = users.find(u => u.email === email && u.password === password);
+        if (!user) return showToast('Invalid email or password', 'error');
+        localStorage.setItem('meal_currentUser', JSON.stringify(user));
+        showToast('Login successful!');
+        setTimeout(() => {
+          window.location.href = user.role === 'admin' ? 'admin-dashboard.html' : 'user-dashboard.html';
+        }, 500);
+      }
+    } catch (err) {
+      showToast(err.message || 'Invalid email or password', 'error');
+    }
   });
 
   // Allow Enter key to submit
@@ -109,14 +129,17 @@ function initAuthApp() {
       const file = e.target.files[0];
       if(!file) return;
       const reader = new FileReader();
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
         try {
           const data = JSON.parse(event.target.result);
-          if (data.meal_users) { localStorage.setItem('meal_users', JSON.stringify(data.meal_users)); if(window.fbRestore) window.fbRestore('meal_users', data.meal_users); }
-          if (data.meal_projects) { localStorage.setItem('meal_projects', JSON.stringify(data.meal_projects)); if(window.fbRestore) window.fbRestore('meal_projects', data.meal_projects); }
-          if (data.meal_enrollments) { localStorage.setItem('meal_enrollments', JSON.stringify(data.meal_enrollments)); if(window.fbRestore) window.fbRestore('meal_enrollments', data.meal_enrollments); }
-          if (data.meal_records) { localStorage.setItem('meal_records', JSON.stringify(data.meal_records)); if(window.fbRestore) window.fbRestore('meal_records', data.meal_records); }
-          if (data.meal_comments) { localStorage.setItem('meal_comments', JSON.stringify(data.meal_comments)); if(window.fbRestore) window.fbRestore('meal_comments', data.meal_comments); }
+          if (window.API) {
+            await window.API.post('backup.php', { action: 'restore' }, data);
+          }
+          if (data.meal_users) localStorage.setItem('meal_users', JSON.stringify(data.meal_users));
+          if (data.meal_projects) localStorage.setItem('meal_projects', JSON.stringify(data.meal_projects));
+          if (data.meal_enrollments) localStorage.setItem('meal_enrollments', JSON.stringify(data.meal_enrollments));
+          if (data.meal_records) localStorage.setItem('meal_records', JSON.stringify(data.meal_records));
+          if (data.meal_comments) localStorage.setItem('meal_comments', JSON.stringify(data.meal_comments));
           showToast('Data restored successfully!');
           setTimeout(() => window.location.reload(), 1500);
         } catch(err) {
@@ -129,5 +152,10 @@ function initAuthApp() {
   }
 }
 
-if (window.firebaseDataLoaded) initAuthApp();
-else window.addEventListener('firebaseDataLoaded', initAuthApp);
+// Run immediately
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initAuthApp);
+} else {
+  initAuthApp();
+}
+window.addEventListener('apiDataLoaded', initAuthApp);

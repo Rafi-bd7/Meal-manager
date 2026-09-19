@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MealManager — Smart Hostel Meal System</title>
   <meta name="description" content="Automate hostel meal calculations, track daily meals, manage finances and generate PDF reports.">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#4f8ef7">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="css/styles.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -73,16 +76,16 @@
         </div>
       </div>
     </section>
+    <section class="contact-section mt-4">
+      <div class="contact-wrapper" style="max-width:600px; margin:0 auto;">
         <div class="contact-info-card card-3d">
-          <h3>Contact Info</h3>
+          <h3><i class="fas fa-address-card" style="color:var(--primary); margin-right:8px;"></i> Contact Info</h3>
           <ul class="contact-list">
             <li><i class="fas fa-envelope"></i> <span>redwanrafi8659@gmail.com</span></li>
             <li><i class="fas fa-phone-alt"></i> <span>+8801940538340</span></li>
             <li><i class="fas fa-map-marker-alt"></i> <span>Dhaka, Bangladesh</span></li>
           </ul>
 
-
-          
           <div class="social-links">
             <a href="https://www.facebook.com/share/1G6RgzX5yT/" target="_blank" class="social-icon facebook" title="Facebook">
               <i class="fab fa-facebook-f"></i>
@@ -115,6 +118,12 @@
       html.setAttribute('data-theme', t);
       localStorage.setItem('mm_theme', t);
     });
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').then(reg => {
+        reg.update();
+      }).catch(() => {});
+    }
   </script>
 </body>
 </html>

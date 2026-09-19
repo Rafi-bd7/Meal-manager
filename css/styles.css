@@ -743,3 +743,172 @@ a { text-decoration:none; color:inherit; }
   transform: scale(1.05);
   box-shadow: 0 6px 15px var(--primary-glow);
 }
+
+/* ─── Bills Grid Layout ─── */
+.bills-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-top: .5rem;
+}
+@media (max-width: 700px) {
+  .bills-grid { grid-template-columns: 1fr; }
+  .bills-grid .bill-item-card[style*="span 2"] { grid-column: span 1; }
+}
+.bill-item-card {
+  display: flex;
+  align-items: flex-start;
+  gap: .85rem;
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 1rem;
+  padding: 1rem 1.1rem;
+  transition: var(--transition);
+}
+.bill-item-card:hover {
+  background: var(--glass-hover);
+  border-color: rgba(79,142,247,.3);
+  transform: translateY(-2px);
+}
+.bill-item-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: .75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+.bill-item-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: .4rem;
+}
+.bill-item-label {
+  font-size: .8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.bill-input {
+  padding: .5rem .75rem !important;
+  font-size: .95rem;
+  font-weight: 700;
+}
+
+/* ─── PWA Install Banner ─── */
+#pwaInstallBanner {
+  position: fixed;
+  bottom: 1.25rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, var(--primary), #6d28d9);
+  color: #fff;
+  padding: .8rem 1.5rem;
+  border-radius: 3rem;
+  display: flex;
+  align-items: center;
+  gap: .85rem;
+  box-shadow: 0 8px 24px rgba(79,142,247,0.5);
+  z-index: 9999;
+  font-size: .88rem;
+  font-weight: 600;
+  animation: slideUp 0.4s ease;
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+#pwaInstallBanner button {
+  background: rgba(255,255,255,0.25);
+  border: 1px solid rgba(255,255,255,.4);
+  color: #fff;
+  padding: .3rem .85rem;
+  border-radius: 2rem;
+  cursor: pointer;
+  font-size: .82rem;
+  font-weight: 600;
+}
+#pwaInstallBanner button:hover { background: rgba(255,255,255,0.4); }
+
+/* ─── Mobile Optimizations & Responsive Polish ─── */
+@media (max-width: 768px) {
+  .tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: .35rem;
+    scrollbar-width: none; /* Firefox */
+  }
+  .tabs::-webkit-scrollbar { display: none; } /* Chrome/Safari */
+  .tab-btn {
+    white-space: nowrap;
+    flex-shrink: 0;
+    padding: 0.65rem 1rem;
+    font-size: 0.85rem;
+  }
+  .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-bottom: 1rem;
+    border-radius: 0.75rem;
+  }
+  /* Prevent iOS zoom on input focus */
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+  .stat-card {
+    padding: 1.25rem 1.1rem;
+  }
+  .stat-value {
+    font-size: 1.75rem;
+  }
+  #chatLauncher {
+    bottom: 20px;
+    right: 20px;
+    width: 52px;
+    height: 52px;
+    font-size: 1.5rem;
+  }
+  #chatWidget {
+    width: calc(100vw - 32px);
+    right: 16px;
+    left: 16px;
+    bottom: 85px;
+    max-height: 70vh;
+  }
+  #pwaInstallBanner {
+    width: calc(100vw - 32px);
+    left: 16px;
+    transform: none;
+    justify-content: space-between;
+    padding: 0.75rem 1.1rem;
+    font-size: 0.82rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .navbar {
+    padding: 0.65rem 0.85rem;
+  }
+  .nav-brand {
+    font-size: 1.15rem;
+  }
+  .container {
+    padding: 0.75rem;
+  }
+  .glass-panel {
+    padding: 1rem;
+    border-radius: 1rem;
+  }
+  .btn {
+    padding: 0.55rem 1rem;
+    font-size: 0.85rem;
+  }
+  th, td {
+    padding: 0.7rem 0.6rem;
+    font-size: 0.82rem;
+  }
+}

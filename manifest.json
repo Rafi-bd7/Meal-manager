@@ -1,0 +1,44 @@
+{
+  "name": "MealManager — Smart Hostel Meal System",
+  "short_name": "MealManager",
+  "description": "Automate hostel meal calculations, track daily meals, manage finances and generate PDF reports.",
+  "start_url": "login.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#080c14",
+  "theme_color": "#4f8ef7",
+  "lang": "en-BD",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "utilities"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Admin Dashboard",
+      "short_name": "Admin",
+      "description": "Open Admin Dashboard",
+      "url": "admin-dashboard.html",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "My Dashboard",
+      "short_name": "Dashboard",
+      "description": "Open User Dashboard",
+      "url": "user-dashboard.html",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}
