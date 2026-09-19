@@ -304,40 +304,104 @@
           </div>
         </div>
 
-        <!-- Printable PDF Container for User Bills (Hidden) -->
-        <div id="userBillsPdfArea" style="display:none; background:#ffffff; color:#0f172a; padding:30px; font-family:'Inter', sans-serif;">
-          <div style="border-bottom:3px solid #4f8ef7; padding-bottom:15px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center;">
+        <!-- Printable PDF Container for User Monthly Bills (Offscreen Fixed A4) -->
+        <div id="userBillsPdfArea" style="position:fixed; left:-9999px; top:0; width:794px; min-height:1050px; background:#ffffff; color:#0f172a; padding:40px; font-family:'Hind Siliguri', 'Inter', sans-serif; box-sizing:border-box; z-index:-999;">
+          <!-- Header with Brand & Gradient Accent -->
+          <div style="border-bottom:3px solid #2563eb; padding-bottom:18px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:flex-start;">
             <div>
-              <h1 style="margin:0; font-size:1.8rem; font-weight:800; color:#4f8ef7;">MealManager</h1>
-              <p style="margin:4px 0 0; font-size:0.95rem; color:#64748b;">মাসিক মেস খরচের রসিদ (Monthly Bills Breakdown)</p>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:1.9rem; font-weight:800; color:#2563eb; letter-spacing:-0.5px;">MealManager</span>
+                <span style="background:#dbeafe; color:#1d4ed8; font-size:0.75rem; font-weight:700; padding:3px 8px; border-radius:6px; text-transform:uppercase;">Invoice</span>
+              </div>
+              <p style="margin:4px 0 0; font-size:0.95rem; color:#475569; font-weight:600;">মাসিক মেস খরচের বিবরণী ও প্রদেয় রসিদ</p>
+              <p style="margin:2px 0 0; font-size:0.8rem; color:#64748b;">মেস ব্যবস্থাপনা সফটওয়্যার — ডিজিটাল হিসাবপত্র</p>
             </div>
             <div style="text-align:right;">
-              <h3 style="margin:0; font-size:1.15rem; color:#0f172a;" id="pdfUserProjName"></h3>
-              <p style="margin:4px 0 0; font-size:0.9rem; color:#64748b;">মাস: <strong id="pdfUserMonth" style="color:#0f172a;"></strong></p>
+              <div style="font-size:0.85rem; color:#64748b; font-weight:600;">রসিদ নম্বর / Receipt No:</div>
+              <div style="font-size:1.15rem; font-weight:800; color:#0f172a; font-family:monospace;" id="pdfUserInvoiceNo">INV-2026-09</div>
+              <div style="margin-top:6px; font-size:0.82rem; color:#64748b;">ইস্যুর তারিখ: <strong id="pdfUserPrintDate" style="color:#0f172a;"></strong></div>
             </div>
           </div>
 
-          <div style="display:flex; justify-content:space-between; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:15px 20px; margin-bottom:20px;">
-            <div><span style="font-size:0.85rem; color:#64748b;">মেসের মোট বিল:</span> <br><strong style="font-size:1.3rem; color:#0f172a;" id="pdfUserGrandTotal">0 ৳</strong></div>
-            <div><span style="font-size:0.85rem; color:#64748b;">মেম্বার সংখ্যা:</span> <br><strong style="font-size:1.3rem; color:#0f172a;" id="pdfUserMemCount">0 জন</strong></div>
-            <div><span style="font-size:0.85rem; color:#64748b;">আপনার প্রদেয় অংশ:</span> <br><strong style="font-size:1.3rem; color:#2563eb;" id="pdfUserMyShare">0 ৳</strong></div>
+          <!-- Meta Info Grid (Project / Mess & Member Info) -->
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:16px 20px; margin-bottom:20px;">
+            <div>
+              <div style="font-size:0.75rem; text-transform:uppercase; color:#64748b; font-weight:700; letter-spacing:0.5px; margin-bottom:4px;">মেসের তথ্য (Mess Details)</div>
+              <div style="font-size:1.15rem; font-weight:700; color:#0f172a;" id="pdfUserProjName">—</div>
+              <div style="font-size:0.85rem; color:#475569; margin-top:2px;">ম্যানেজার: <span id="pdfUserManagerName" style="font-weight:600; color:#0f172a;">—</span></div>
+              <div style="font-size:0.85rem; color:#475569;">বিলের মাস: <strong id="pdfUserMonth" style="color:#2563eb;">—</strong></div>
+            </div>
+            <div style="border-left:1px solid #e2e8f0; padding-left:20px;">
+              <div style="font-size:0.75rem; text-transform:uppercase; color:#64748b; font-weight:700; letter-spacing:0.5px; margin-bottom:4px;">মেম্বারের বিবরণ (Member Details)</div>
+              <div style="font-size:1.15rem; font-weight:700; color:#0f172a;" id="pdfUserMemberName">—</div>
+              <div style="font-size:0.85rem; color:#475569; margin-top:2px;">ইমেইল: <span id="pdfUserMemberEmail" style="color:#0f172a;">—</span></div>
+              <div style="font-size:0.85rem; color:#475569;">স্ট্যাটাস: <span style="background:#dcfce7; color:#15803d; font-size:0.75rem; font-weight:700; padding:2px 8px; border-radius:4px;">অনুমোদিত সদস্য (Active)</span></div>
+            </div>
           </div>
 
-          <table style="width:100%; border-collapse:collapse; margin-bottom:25px;">
+          <!-- Key Statistics Summary Cards -->
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin-bottom:24px;">
+            <div style="background:#ffffff; border:1.5px solid #cbd5e1; border-radius:10px; padding:14px 18px;">
+              <div style="font-size:0.8rem; color:#64748b; font-weight:600;">মেসের সর্বমোট বিল</div>
+              <div style="font-size:1.35rem; font-weight:800; color:#d97706; margin-top:4px;" id="pdfUserGrandTotal">0.00 ৳</div>
+              <div style="font-size:0.75rem; color:#94a3b8; margin-top:2px;">খাতওয়ারি মোট খরচ</div>
+            </div>
+            <div style="background:#ffffff; border:1.5px solid #cbd5e1; border-radius:10px; padding:14px 18px;">
+              <div style="font-size:0.8rem; color:#64748b; font-weight:600;">মোট সদস্য সংখ্যা</div>
+              <div style="font-size:1.35rem; font-weight:800; color:#0f172a; margin-top:4px;" id="pdfUserMemCount">0 জন</div>
+              <div style="font-size:0.75rem; color:#94a3b8; margin-top:2px;">ভাগীদার সদস্য</div>
+            </div>
+            <div style="background:#eff6ff; border:2px solid #2563eb; border-radius:10px; padding:14px 18px;">
+              <div style="font-size:0.8rem; color:#1d4ed8; font-weight:700;">আপনার প্রদেয় অংশ (মাথাপিছু)</div>
+              <div style="font-size:1.45rem; font-weight:800; color:#2563eb; margin-top:4px;" id="pdfUserMyShare">0.00 ৳</div>
+              <div style="font-size:0.75rem; color:#3b82f6; margin-top:2px;">সর্বমোট প্রদেয় মেস বিল</div>
+            </div>
+          </div>
+
+          <!-- Table Header Title -->
+          <div style="margin-bottom:10px; display:flex; justify-content:space-between; align-items:flex-end;">
+            <h3 style="margin:0; font-size:1.05rem; font-weight:700; color:#0f172a;">খাত অনুযায়ী মাসিক খরচের তালিকা (Itemized Breakdown)</h3>
+            <span style="font-size:0.8rem; color:#64748b;">মুদ্রা: বাংলাদেশী টাকা (BDT ৳)</span>
+          </div>
+
+          <!-- Itemized Expenses Table -->
+          <table style="width:100%; border-collapse:collapse; margin-bottom:24px; border:1px solid #e2e8f0; border-radius:8px; overflow:hidden;">
             <thead>
-              <tr style="background:#f1f5f9; border-bottom:2px solid #cbd5e1;">
-                <th style="padding:10px; text-align:left; font-size:0.9rem; color:#334155;">বিলের বিবরণ</th>
-                <th style="padding:10px; text-align:center; font-size:0.9rem; color:#334155;">মেসের মোট বিল (৳)</th>
-                <th style="padding:10px; text-align:center; font-size:0.9rem; color:#334155;">সদস্য সংখ্যা</th>
-                <th style="padding:10px; text-align:right; font-size:0.9rem; color:#334155;">আপনার অংশ (৳)</th>
+              <tr style="background:#1e293b; color:#ffffff;">
+                <th style="padding:11px 14px; text-align:left; font-size:0.85rem; font-weight:700; letter-spacing:0.3px;">ক্রম</th>
+                <th style="padding:11px 14px; text-align:left; font-size:0.85rem; font-weight:700; letter-spacing:0.3px;">খরচের বিবরণ (Expense Item)</th>
+                <th style="padding:11px 14px; text-align:center; font-size:0.85rem; font-weight:700; letter-spacing:0.3px;">মেসের মোট খরচ</th>
+                <th style="padding:11px 14px; text-align:center; font-size:0.85rem; font-weight:700; letter-spacing:0.3px;">সদস্য সংখ্যা</th>
+                <th style="padding:11px 14px; text-align:right; font-size:0.85rem; font-weight:700; letter-spacing:0.3px; color:#93c5fd;">আপনার প্রদেয় অংশ</th>
               </tr>
             </thead>
             <tbody id="pdfUserBillsTableBody"></tbody>
           </table>
 
-          <div style="border-top:1px dashed #cbd5e1; padding-top:15px; display:flex; justify-content:space-between; font-size:0.8rem; color:#94a3b8;">
-            <span>Generated by MealManager App</span>
-            <span id="pdfUserPrintDate"></span>
+          <!-- Members Breakdown List -->
+          <div style="margin-bottom:25px;" id="pdfUserMembersSection">
+            <div style="font-size:0.9rem; font-weight:700; color:#0f172a; margin-bottom:8px;">মেসের সকল সদস্যদের তালিকা ও অংশ বণ্টন:</div>
+            <div id="pdfUserMembersList" style="display:grid; grid-template-columns:repeat(2, 1fr); gap:8px;"></div>
+          </div>
+
+          <!-- Signatures and Verification -->
+          <div style="border-top:1.5px dashed #cbd5e1; padding-top:35px; margin-top:30px; display:flex; justify-content:space-between; align-items:flex-end;">
+            <div style="text-align:center; width:220px;">
+              <div style="border-bottom:1px solid #64748b; height:35px; margin-bottom:6px;"></div>
+              <div style="font-size:0.88rem; font-weight:700; color:#0f172a;">মেম্বারের স্বাক্ষর</div>
+              <div style="font-size:0.75rem; color:#64748b;">(Member's Signature)</div>
+            </div>
+            <div style="text-align:center;">
+              <div style="display:inline-block; border:1.5px solid #22c55e; color:#15803d; border-radius:6px; padding:6px 14px; font-size:0.78rem; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">
+                ✓ Verified by MealManager
+              </div>
+              <div style="font-size:0.75rem; color:#94a3b8; margin-top:4px;">সিস্টেম জেনারেটেড ডিজিটাল রসিদ</div>
+            </div>
+            <div style="text-align:center; width:220px;">
+              <div style="border-bottom:1px solid #64748b; height:35px; margin-bottom:6px;"></div>
+              <div style="font-size:0.88rem; font-weight:700; color:#0f172a;">ম্যানেজার / পরিচালকের স্বাক্ষর</div>
+              <div style="font-size:0.75rem; color:#64748b;">(Manager's Signature)</div>
+            </div>
           </div>
         </div>
       </div>

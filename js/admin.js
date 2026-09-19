@@ -1508,76 +1508,124 @@ function initAdminApp() {
   });
 
   // ─── Download Bills PDF ───
-  document.getElementById('downloadBillsPdfBtn')?.addEventListener('click', () => {
+  document.getElementById('downloadBillsPdfBtn')?.addEventListener('click', async () => {
     const area = document.getElementById('billsPdfArea');
     if (!area) return;
 
-    const billsMonthEl = document.getElementById('billsMonth');
-    const month = billsMonthEl && billsMonthEl.value ? billsMonthEl.value : _curMonthStr;
-    const projects = JSON.parse(localStorage.getItem('meal_projects')) || [];
-    const p = projects.find(x => x.id === curProjId);
-    const memCount = getApprovedMemberCount();
+    const btn = document.getElementById('downloadBillsPdfBtn');
+    const origBtnHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="color:#ef4444;"></i> PDF তৈরি হচ্ছে...';
+    }
 
-    document.getElementById('pdfProjNameBills').textContent = p ? p.name : 'Hostel Mess';
-    document.getElementById('pdfMonthBills').textContent = month;
-    document.getElementById('pdfMemCountBills').textContent = memCount + ' জন';
-    document.getElementById('pdfPrintDate').textContent = 'তারিখ: ' + new Date().toLocaleDateString('bn-BD');
+    try {
+      const billsMonthEl = document.getElementById('billsMonth');
+      const month = billsMonthEl && billsMonthEl.value ? billsMonthEl.value : _curMonthStr;
+      const projects = JSON.parse(localStorage.getItem('meal_projects')) || [];
+      const p = projects.find(x => x.id === curProjId);
+      const enrolls = JSON.parse(localStorage.getItem('meal_enrollments')) || [];
+      const approvedMems = enrolls.filter(e => String(e.projectId || e.project_id) === String(curProjId) && e.status === 'approved');
+      const memCount = Math.max(1, approvedMems.length);
+      const users = JSON.parse(localStorage.getItem('meal_users')) || [];
+      const managerUser = cur;
 
-    let grandTotal = 0;
-    let tableHtml = '';
+      let grandTotal = 0;
+      let tableHtml = '';
+      let sl = 1;
 
-    billFields.forEach(f => {
-      const val = parseFloat(document.getElementById(f.id)?.value || 0);
-      grandTotal += val;
-      const perHead = val / memCount;
-      tableHtml += `<tr style="border-bottom:1px solid #e2e8f0;">
-        <td style="padding:10px; text-align:left; font-size:0.9rem;">${f.name}</td>
-        <td style="padding:10px; text-align:center; font-size:0.9rem; font-weight:600;">${val.toFixed(2)} ৳</td>
-        <td style="padding:10px; text-align:center; font-size:0.9rem;">${memCount} জন</td>
-        <td style="padding:10px; text-align:right; font-size:0.9rem; font-weight:700; color:#2563eb;">${perHead.toFixed(2)} ৳</td>
+      billFields.forEach(f => {
+        const val = parseFloat(document.getElementById(f.id)?.value || 0);
+        grandTotal += val;
+        const perHead = val / memCount;
+        tableHtml += `<tr style="border-bottom:1px solid #e2e8f0; background:${sl % 2 === 0 ? '#f8fafc' : '#ffffff'};">
+          <td style="padding:10px 14px; text-align:left; font-size:0.85rem; color:#64748b;">${sl++}</td>
+          <td style="padding:10px 14px; text-align:left; font-size:0.9rem; font-weight:600; color:#0f172a;">${f.name}</td>
+          <td style="padding:10px 14px; text-align:center; font-size:0.9rem; font-weight:700; color:#0f172a;">${val.toFixed(2)} ৳</td>
+          <td style="padding:10px 14px; text-align:center; font-size:0.9rem; color:#475569;">${memCount} জন</td>
+          <td style="padding:10px 14px; text-align:right; font-size:0.95rem; font-weight:700; color:#2563eb;">${perHead.toFixed(2)} ৳</td>
+        </tr>`;
+      });
+
+      customBills.forEach(cb => {
+        const val = parseFloat(cb.amount) || 0;
+        grandTotal += val;
+        const perHead = val / memCount;
+        const title = cb.name.trim() || 'অন্যান্য বিল';
+        tableHtml += `<tr style="border-bottom:1px solid #e2e8f0; background:${sl % 2 === 0 ? '#f8fafc' : '#ffffff'};">
+          <td style="padding:10px 14px; text-align:left; font-size:0.85rem; color:#64748b;">${sl++}</td>
+          <td style="padding:10px 14px; text-align:left; font-size:0.9rem; font-weight:600; color:#0f172a;">📌 ${title}</td>
+          <td style="padding:10px 14px; text-align:center; font-size:0.9rem; font-weight:700; color:#0f172a;">${val.toFixed(2)} ৳</td>
+          <td style="padding:10px 14px; text-align:center; font-size:0.9rem; color:#475569;">${memCount} জন</td>
+          <td style="padding:10px 14px; text-align:right; font-size:0.95rem; font-weight:700; color:#2563eb;">${perHead.toFixed(2)} ৳</td>
+        </tr>`;
+      });
+
+      const perHeadGrand = grandTotal / memCount;
+      tableHtml += `<tr style="background:#f1f5f9; border-top:2px solid #2563eb; font-weight:bold;">
+        <td style="padding:12px 14px; text-align:left; font-size:0.95rem; color:#0f172a;" colspan="2">সর্বমোট মেস বিল (Grand Total)</td>
+        <td style="padding:12px 14px; text-align:center; font-size:1.1rem; color:#d97706; font-weight:800;">${grandTotal.toFixed(2)} ৳</td>
+        <td style="padding:12px 14px; text-align:center; font-size:0.95rem; color:#0f172a;">${memCount} জন</td>
+        <td style="padding:12px 14px; text-align:right; font-size:1.15rem; color:#2563eb; font-weight:800;">${perHeadGrand.toFixed(2)} ৳</td>
       </tr>`;
-    });
 
-    customBills.forEach(cb => {
-      const val = parseFloat(cb.amount) || 0;
-      grandTotal += val;
-      const perHead = val / memCount;
-      const title = cb.name.trim() || 'অন্যান্য বিল';
-      tableHtml += `<tr style="border-bottom:1px solid #e2e8f0;">
-        <td style="padding:10px; text-align:left; font-size:0.9rem;">📌 ${title}</td>
-        <td style="padding:10px; text-align:center; font-size:0.9rem; font-weight:600;">${val.toFixed(2)} ৳</td>
-        <td style="padding:10px; text-align:center; font-size:0.9rem;">${memCount} জন</td>
-        <td style="padding:10px; text-align:right; font-size:0.9rem; font-weight:700; color:#2563eb;">${perHead.toFixed(2)} ৳</td>
-      </tr>`;
-    });
+      // Members list
+      const memsHtml = approvedMems.map((m, idx) => {
+        const u = users.find(x => x.id === (m.userId || m.user_id));
+        const uName = u ? u.name : 'মেম্বার ' + (idx + 1);
+        return `<div style="padding:7px 12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; font-size:0.82rem; display:flex; justify-content:space-between; align-items:center;">
+          <span><strong>${idx + 1}. ${uName}</strong></span>
+          <span style="font-weight:700; color:#2563eb;">${perHeadGrand.toFixed(2)} ৳</span>
+        </div>`;
+      }).join('');
 
-    const perHeadGrand = grandTotal / memCount;
-    tableHtml += `<tr style="background:#f8fafc; border-top:2px solid #2563eb; font-weight:bold;">
-      <td style="padding:12px 10px; font-size:1rem; color:#1e293b;">সর্বমোট মেস বিল (Grand Total)</td>
-      <td style="padding:12px 10px; text-align:center; font-size:1rem; color:#d97706;">${grandTotal.toFixed(2)} ৳</td>
-      <td style="padding:12px 10px; text-align:center; font-size:0.95rem;">${memCount} জন</td>
-      <td style="padding:12px 10px; text-align:right; font-size:1.1rem; color:#2563eb;">${perHeadGrand.toFixed(2)} ৳</td>
-    </tr>`;
+      const invNo = 'INV-' + month.replace('-', '') + '-' + (curProjId ? String(curProjId).slice(-4).toUpperCase() : 'MESS');
+      const pInv = document.getElementById('pdfInvoiceNoBills');
+      const pName = document.getElementById('pdfProjNameBills');
+      const pMgr = document.getElementById('pdfManagerNameBills');
+      const pEmail = document.getElementById('pdfManagerEmailBills');
+      const pMonth = document.getElementById('pdfMonthBills');
+      const pGrand = document.getElementById('pdfGrandTotalBills');
+      const pMem = document.getElementById('pdfMemCountBills');
+      const pPerHead = document.getElementById('pdfPerHeadBills');
+      const pDate = document.getElementById('pdfPrintDate');
+      const pBody = document.getElementById('pdfBillsTableBody');
+      const pMemsList = document.getElementById('pdfAdminMembersList');
 
-    document.getElementById('pdfGrandTotalBills').textContent = grandTotal.toFixed(2) + ' ৳';
-    document.getElementById('pdfPerHeadBills').textContent = perHeadGrand.toFixed(2) + ' ৳';
-    document.getElementById('pdfBillsTableBody').innerHTML = tableHtml;
+      if (pInv) pInv.textContent = invNo;
+      if (pName) pName.textContent = p ? p.name : 'Hostel Mess';
+      if (pMgr) pMgr.textContent = managerUser ? managerUser.name : 'মেস ম্যানেজার';
+      if (pEmail) pEmail.textContent = managerUser ? (managerUser.email || '—') : '—';
+      if (pMonth) pMonth.textContent = month;
+      if (pGrand) pGrand.textContent = grandTotal.toFixed(2) + ' ৳';
+      if (pMem) pMem.textContent = memCount + ' জন';
+      if (pPerHead) pPerHead.textContent = perHeadGrand.toFixed(2) + ' ৳';
+      if (pDate) pDate.textContent = new Date().toLocaleString('bn-BD', { dateStyle: 'medium', timeStyle: 'short' });
+      if (pBody) pBody.innerHTML = tableHtml;
+      if (pMemsList) pMemsList.innerHTML = memsHtml;
 
-    area.style.display = 'block';
-    const opt = {
-      margin: 0.4,
-      filename: `MealManager_Bills_${month}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-    };
-    html2pdf().set(opt).from(area).save().then(() => {
-      area.style.display = 'none';
-      showToast('বিলের PDF রসিদ সফলভাবে ডাউনলোড হয়েছে! 📄');
-    }).catch(err => {
-      area.style.display = 'none';
+      // Small async tick for paint completion
+      await new Promise(r => setTimeout(r, 150));
+
+      const opt = {
+        margin: [0.3, 0.3, 0.3, 0.3],
+        filename: `MealManager_Bills_${month}_Admin.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+      };
+
+      await html2pdf().set(opt).from(area).save();
+      showToast('মাসিক বিলের PDF সফলভাবে ডাউনলোড হয়েছে! 📄');
+    } catch (err) {
+      console.error('Admin bills PDF export error:', err);
       showToast('PDF তৈরিতে সমস্যা হয়েছে: ' + err.message, 'error');
-    });
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = origBtnHtml;
+      }
+    }
   });
 
   // ─── Device Push Notification Helper ───

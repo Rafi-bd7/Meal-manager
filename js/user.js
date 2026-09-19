@@ -926,96 +926,142 @@ function initUserApp() {
   window.loadUserBills = loadUserBills;
 
   // ─── Download User Bills PDF ───
-  document.getElementById('downloadUserBillsPdfBtn')?.addEventListener('click', () => {
+  document.getElementById('downloadUserBillsPdfBtn')?.addEventListener('click', async () => {
     const area = document.getElementById('userBillsPdfArea');
     if (!area || !curProj) return;
 
-    const curMonthStr = getUserBillsMonth();
-
-    const enrolls = JSON.parse(localStorage.getItem('meal_enrollments')) || [];
-    const approvedMems = enrolls.filter(e => (e.projectId || e.project_id) === curProj.id && e.status === 'approved');
-    const memCount = Math.max(1, approvedMems.length);
-
-    const bills = JSON.parse(localStorage.getItem('meal_bills')) || [];
-    const b = bills.find(x => (x.projectId || x.project_id) === curProj.id && (x.monthYear || x.month_year) === curMonthStr);
-
-    let customBills = [];
-    if (b) {
-      const note = b.otherBillsNote || b.other_bills_note || '';
-      if (note && note.startsWith('[')) {
-        try { customBills = JSON.parse(note); } catch(e) { customBills = []; }
-      } else if (parseFloat(b.otherBills || b.other_bills || 0) > 0) {
-        customBills = [{ id: 'cb_1', name: note || 'অন্যান্য বিল', amount: parseFloat(b.otherBills || b.other_bills || 0) }];
-      }
+    const btn = document.getElementById('downloadUserBillsPdfBtn');
+    const origBtnHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="color:#ef4444;"></i> PDF তৈরি হচ্ছে...';
     }
 
-    let grandTotal = 0;
-    let pdfTableHtml = '';
+    try {
+      const curMonthStr = getUserBillsMonth();
 
-    userBillDefs.forEach(def => {
-      const val = getBillVal(b, def.key, def.altKey);
-      grandTotal += val;
-      const perHead = val / memCount;
-      pdfTableHtml += `<tr style="border-bottom:1px solid #e2e8f0;">
-        <td style="padding:10px; text-align:left; font-size:0.9rem;">${def.name}</td>
-        <td style="padding:10px; text-align:center; font-size:0.9rem; font-weight:600;">${val.toFixed(2)} ৳</td>
-        <td style="padding:10px; text-align:center; font-size:0.9rem;">${memCount} জন</td>
-        <td style="padding:10px; text-align:right; font-size:0.9rem; font-weight:700; color:#2563eb;">${perHead.toFixed(2)} ৳</td>
+      const enrolls = JSON.parse(localStorage.getItem('meal_enrollments')) || [];
+      const approvedMems = enrolls.filter(e => String(e.projectId || e.project_id) === String(curProj.id) && e.status === 'approved');
+      const memCount = Math.max(1, approvedMems.length);
+
+      const bills = JSON.parse(localStorage.getItem('meal_bills')) || [];
+      const b = bills.find(x => String(x.projectId || x.project_id) === String(curProj.id) && String(x.monthYear || x.month_year) === String(curMonthStr));
+
+      const users = JSON.parse(localStorage.getItem('meal_users')) || [];
+      const managerUser = users.find(u => u.id === (curProj.adminId || curProj.admin_id));
+
+      let customBills = [];
+      if (b) {
+        const note = b.otherBillsNote || b.other_bills_note || '';
+        if (note && typeof note === 'string' && note.startsWith('[')) {
+          try { customBills = JSON.parse(note); } catch(e) { customBills = []; }
+        } else if (parseFloat(b.otherBills || b.other_bills || 0) > 0) {
+          customBills = [{ id: 'cb_1', name: note || 'অন্যান্য বিল', amount: parseFloat(b.otherBills || b.other_bills || 0) }];
+        }
+      }
+
+      let grandTotal = 0;
+      let pdfTableHtml = '';
+      let sl = 1;
+
+      userBillDefs.forEach(def => {
+        const val = getBillVal(b, def.key, def.altKey);
+        grandTotal += val;
+        const perHead = val / memCount;
+        pdfTableHtml += `<tr style="border-bottom:1px solid #e2e8f0; background:${sl % 2 === 0 ? '#f8fafc' : '#ffffff'};">
+          <td style="padding:10px 14px; text-align:left; font-size:0.85rem; color:#64748b;">${sl++}</td>
+          <td style="padding:10px 14px; text-align:left; font-size:0.9rem; font-weight:600; color:#0f172a;">${def.name}</td>
+          <td style="padding:10px 14px; text-align:center; font-size:0.9rem; font-weight:700; color:#0f172a;">${val.toFixed(2)} ৳</td>
+          <td style="padding:10px 14px; text-align:center; font-size:0.9rem; color:#475569;">${memCount} জন</td>
+          <td style="padding:10px 14px; text-align:right; font-size:0.95rem; font-weight:700; color:#2563eb;">${perHead.toFixed(2)} ৳</td>
+        </tr>`;
+      });
+
+      customBills.forEach(cb => {
+        const val = parseFloat(cb.amount) || 0;
+        grandTotal += val;
+        const perHead = val / memCount;
+        const title = cb.name.trim() || 'অন্যান্য বিল';
+        pdfTableHtml += `<tr style="border-bottom:1px solid #e2e8f0; background:${sl % 2 === 0 ? '#f8fafc' : '#ffffff'};">
+          <td style="padding:10px 14px; text-align:left; font-size:0.85rem; color:#64748b;">${sl++}</td>
+          <td style="padding:10px 14px; text-align:left; font-size:0.9rem; font-weight:600; color:#0f172a;">📌 ${title}</td>
+          <td style="padding:10px 14px; text-align:center; font-size:0.9rem; font-weight:700; color:#0f172a;">${val.toFixed(2)} ৳</td>
+          <td style="padding:10px 14px; text-align:center; font-size:0.9rem; color:#475569;">${memCount} জন</td>
+          <td style="padding:10px 14px; text-align:right; font-size:0.95rem; font-weight:700; color:#2563eb;">${perHead.toFixed(2)} ৳</td>
+        </tr>`;
+      });
+
+      const myShareGrand = grandTotal / memCount;
+
+      // Grand Total Row
+      pdfTableHtml += `<tr style="background:#f1f5f9; border-top:2px solid #2563eb; font-weight:bold;">
+        <td style="padding:12px 14px; text-align:left; font-size:0.95rem; color:#0f172a;" colspan="2">সর্বমোট মেস বিল (Grand Total)</td>
+        <td style="padding:12px 14px; text-align:center; font-size:1.1rem; color:#d97706; font-weight:800;">${grandTotal.toFixed(2)} ৳</td>
+        <td style="padding:12px 14px; text-align:center; font-size:0.95rem; color:#0f172a;">${memCount} জন</td>
+        <td style="padding:12px 14px; text-align:right; font-size:1.15rem; color:#2563eb; font-weight:800;">${myShareGrand.toFixed(2)} ৳</td>
       </tr>`;
-    });
 
-    customBills.forEach(cb => {
-      const val = parseFloat(cb.amount) || 0;
-      grandTotal += val;
-      const perHead = val / memCount;
-      const title = cb.name.trim() || 'অন্যান্য বিল';
-      pdfTableHtml += `<tr style="border-bottom:1px solid #e2e8f0;">
-        <td style="padding:10px; text-align:left; font-size:0.9rem;">📌 ${title}</td>
-        <td style="padding:10px; text-align:center; font-size:0.9rem; font-weight:600;">${val.toFixed(2)} ৳</td>
-        <td style="padding:10px; text-align:center; font-size:0.9rem;">${memCount} জন</td>
-        <td style="padding:10px; text-align:right; font-size:0.9rem; font-weight:700; color:#2563eb;">${perHead.toFixed(2)} ৳</td>
-      </tr>`;
-    });
+      // Members Breakdown List
+      const memsHtml = approvedMems.map((m, idx) => {
+        const u = users.find(x => x.id === (m.userId || m.user_id));
+        const uName = u ? u.name : 'মেম্বার ' + (idx + 1);
+        const isMe = (m.userId || m.user_id) === cur.id;
+        return `<div style="padding:7px 12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; font-size:0.82rem; display:flex; justify-content:space-between; align-items:center;">
+          <span><strong>${idx + 1}. ${uName}</strong> ${isMe ? '<span style="color:#2563eb; font-weight:700; font-size:0.75rem;">(আপনি)</span>' : ''}</span>
+          <span style="font-weight:700; color:#2563eb;">${myShareGrand.toFixed(2)} ৳</span>
+        </div>`;
+      }).join('');
 
-    const myShareGrand = grandTotal / memCount;
-    pdfTableHtml += `<tr style="background:#f8fafc; border-top:2px solid #2563eb; font-weight:bold;">
-      <td style="padding:12px 10px; font-size:1rem; color:#1e293b;">সর্বমোট মেস বিল (Grand Total)</td>
-      <td style="padding:12px 10px; text-align:center; font-size:1rem; color:#d97706;">${grandTotal.toFixed(2)} ৳</td>
-      <td style="padding:12px 10px; text-align:center; font-size:0.95rem;">${memCount} জন</td>
-      <td style="padding:12px 10px; text-align:right; font-size:1.1rem; color:#2563eb;">${myShareGrand.toFixed(2)} ৳</td>
-    </tr>`;
+      // Populate Template
+      const invNo = 'INV-' + curMonthStr.replace('-', '') + '-' + String(curProj.id).slice(-4).toUpperCase();
+      const pInv = document.getElementById('pdfUserInvoiceNo');
+      const pName = document.getElementById('pdfUserProjName');
+      const pMgr = document.getElementById('pdfUserManagerName');
+      const pMonth = document.getElementById('pdfUserMonth');
+      const pMemName = document.getElementById('pdfUserMemberName');
+      const pMemEmail = document.getElementById('pdfUserMemberEmail');
+      const pTotal = document.getElementById('pdfUserGrandTotal');
+      const pMem = document.getElementById('pdfUserMemCount');
+      const pShare = document.getElementById('pdfUserMyShare');
+      const pDate = document.getElementById('pdfUserPrintDate');
+      const pBody = document.getElementById('pdfUserBillsTableBody');
+      const pMemsList = document.getElementById('pdfUserMembersList');
 
-    const pName = document.getElementById('pdfUserProjName');
-    const pMonth = document.getElementById('pdfUserMonth');
-    const pTotal = document.getElementById('pdfUserGrandTotal');
-    const pMem = document.getElementById('pdfUserMemCount');
-    const pShare = document.getElementById('pdfUserMyShare');
-    const pDate = document.getElementById('pdfUserPrintDate');
-    const pBody = document.getElementById('pdfUserBillsTableBody');
+      if (pInv) pInv.textContent = invNo;
+      if (pName) pName.textContent = curProj.name;
+      if (pMgr) pMgr.textContent = managerUser ? managerUser.name : 'মেস ম্যানেজার';
+      if (pMonth) pMonth.textContent = curMonthStr;
+      if (pMemName) pMemName.textContent = cur.name;
+      if (pMemEmail) pMemEmail.textContent = cur.email || '—';
+      if (pTotal) pTotal.textContent = grandTotal.toFixed(2) + ' ৳';
+      if (pMem) pMem.textContent = memCount + ' জন';
+      if (pShare) pShare.textContent = myShareGrand.toFixed(2) + ' ৳';
+      if (pDate) pDate.textContent = new Date().toLocaleString('bn-BD', { dateStyle: 'medium', timeStyle: 'short' });
+      if (pBody) pBody.innerHTML = pdfTableHtml;
+      if (pMemsList) pMemsList.innerHTML = memsHtml;
 
-    if (pName) pName.textContent = curProj.name;
-    if (pMonth) pMonth.textContent = curMonthStr;
-    if (pTotal) pTotal.textContent = grandTotal.toFixed(2) + ' ৳';
-    if (pMem) pMem.textContent = memCount + ' জন';
-    if (pShare) pShare.textContent = myShareGrand.toFixed(2) + ' ৳';
-    if (pDate) pDate.textContent = 'ডাউনলোডের তারিখ: ' + new Date().toLocaleDateString('bn-BD');
-    if (pBody) pBody.innerHTML = pdfTableHtml;
+      // Small async tick for paint completion
+      await new Promise(r => setTimeout(r, 150));
 
-    area.style.display = 'block';
-    const opt = {
-      margin: 0.4,
-      filename: `MealManager_Bills_${curMonthStr}_${cur.name}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-    };
-    html2pdf().set(opt).from(area).save().then(() => {
-      area.style.display = 'none';
+      const opt = {
+        margin: [0.3, 0.3, 0.3, 0.3],
+        filename: `MealManager_Bill_${curMonthStr}_${cur.name.replace(/\s+/g, '_')}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+      };
+
+      await html2pdf().set(opt).from(area).save();
       showToast('মাসিক বিলের PDF সফলভাবে ডাউনলোড হয়েছে! 📄');
-    }).catch(err => {
-      area.style.display = 'none';
+    } catch (err) {
+      console.error('PDF export error:', err);
       showToast('PDF তৈরিতে সমস্যা হয়েছে: ' + err.message, 'error');
-    });
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = origBtnHtml;
+      }
+    }
   });
 }
 
