@@ -68,7 +68,12 @@ if ($action === 'state') {
         FROM comments c
         LEFT JOIN users u ON c.user_id = u.id
         ORDER BY c.time DESC")->fetchAll();
-    $chats = $db->query("SELECT id, project_id as projectId, user_id as userId, user_name as userName, text, time FROM chats ORDER BY time ASC")->fetchAll();
+    $chats = $db->query("SELECT c.id, c.project_id as projectId, c.user_id as userId,
+        c.user_name as userName, c.text, c.image, c.time,
+        u.photo as userPhoto
+        FROM chats c
+        LEFT JOIN users u ON c.user_id = u.id
+        ORDER BY c.time ASC LIMIT 300")->fetchAll();
     $notifs = $db->query("SELECT id, project_id as projectId, to_user as `to`, message, time FROM notifications ORDER BY time DESC LIMIT 100")->fetchAll();
 
     // Market Expenses
