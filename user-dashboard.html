@@ -181,7 +181,7 @@
       <div id="tab-bills" class="tab-content glass-panel">
         <div class="flex items-center justify-between flex-wrap gap-3 mb-3">
           <h3 style="font-size:1.05rem; margin:0;"><i class="fas fa-file-invoice" style="color:var(--warning);"></i> মাসিক নির্দিষ্ট খরচ ও আপনার অংশ</h3>
-          <input type="month" id="billsUserMonth" class="form-control" style="width:auto; padding:.5rem .85rem;">
+          <input type="month" id="billsUserMonth" class="form-control" style="width:auto; padding:.5rem .85rem;" onchange="if(window.loadUserBills) window.loadUserBills();">
         </div>
 
         <!-- Summary Stats for User -->

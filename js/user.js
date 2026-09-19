@@ -71,10 +71,14 @@ function initUserApp() {
     }
   }
 
+  function refreshUserData() {
+    initUser();
+    loadUserBills();
+  }
+
   window.addEventListener('storage', e => {
     if(!e.key || ['meal_records','meal_enrollments','meal_projects','meal_comments','meal_bills'].includes(e.key)) {
-      initUser();
-      loadUserBills();
+      refreshUserData();
     }
     
     if(!e.key || e.key === 'meal_notifications') {
@@ -94,13 +98,32 @@ function initUserApp() {
     }
   });
 
+  window.addEventListener('appDataSynced', refreshUserData);
+  window.addEventListener('apiDataLoaded', refreshUserData);
+
   const tabs = document.querySelectorAll('.tab-btn');
   const contents = document.querySelectorAll('.tab-content');
   tabs.forEach(btn => btn.addEventListener('click', () => {
     tabs.forEach(t => t.classList.remove('active'));
     contents.forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
-    document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+    const target = document.getElementById(`tab-${btn.dataset.tab}`);
+    if (target) target.classList.add('active');
+
+    // Dynamic data reload on tab switch so member always sees newest updates
+    if (btn.dataset.tab === 'bills') {
+      loadUserBills();
+    } else if (btn.dataset.tab === 'meals') {
+      loadMeals();
+    } else if (btn.dataset.tab === 'comments') {
+      loadMyComments();
+    } else if (btn.dataset.tab === 'menu') {
+      loadMenu();
+    } else if (btn.dataset.tab === 'notices') {
+      loadUserNotices();
+    } else if (btn.dataset.tab === 'profiles') {
+      loadProfiles();
+    }
   }));
 
   let curProj = null;
@@ -481,18 +504,28 @@ function initUserApp() {
     { key: 'garbageBill', altKey: 'garbage_bill', name: 'ময়লা বিল (Garbage)', icon: 'fa-trash-alt' }
   ];
 
+  function getUserBillsMonth() {
+    const monthEl = document.getElementById('billsUserMonth');
+    if (monthEl && monthEl.value) {
+      return monthEl.value;
+    }
+    const tzOffset = (new Date()).getTimezoneOffset() * 60000;
+    const defaultMonth = (new Date(Date.now() - tzOffset)).toISOString().slice(0, 7);
+    if (monthEl) monthEl.value = defaultMonth;
+    return defaultMonth;
+  }
+
   const userBillsMonthInp = document.getElementById('billsUserMonth');
   if (userBillsMonthInp) {
     if (!userBillsMonthInp.value) {
-      userBillsMonthInp.value = (new Date()).toISOString().slice(0, 7);
+      userBillsMonthInp.value = getUserBillsMonth();
     }
-    userBillsMonthInp.addEventListener('change', loadUserBills);
+    userBillsMonthInp.addEventListener('change', () => loadUserBills());
   }
 
   function loadUserBills() {
     if (!curProj) return;
-    const monthEl = document.getElementById('billsUserMonth');
-    const curMonthStr = monthEl ? monthEl.value : (new Date()).toISOString().slice(0, 7);
+    const curMonthStr = getUserBillsMonth();
     
     const enrolls = JSON.parse(localStorage.getItem('meal_enrollments')) || [];
     const approvedMems = enrolls.filter(e => (e.projectId || e.project_id) === curProj.id && e.status === 'approved');
@@ -504,7 +537,7 @@ function initUserApp() {
     let customBills = [];
     if (b) {
       const note = b.otherBillsNote || b.other_bills_note || '';
-      if (note && note.startsWith('[')) {
+      if (note && typeof note === 'string' && note.startsWith('[')) {
         try { customBills = JSON.parse(note); } catch(e) { customBills = []; }
       } else if (parseFloat(b.otherBills || b.other_bills || 0) > 0) {
         customBills = [{ id: 'cb_1', name: note || 'অন্যান্য বিল', amount: parseFloat(b.otherBills || b.other_bills || 0) }];
@@ -577,13 +610,14 @@ function initUserApp() {
     }
   }
 
+  window.loadUserBills = loadUserBills;
+
   // ─── Download User Bills PDF ───
   document.getElementById('downloadUserBillsPdfBtn')?.addEventListener('click', () => {
     const area = document.getElementById('userBillsPdfArea');
     if (!area || !curProj) return;
 
-    const monthEl = document.getElementById('billsUserMonth');
-    const curMonthStr = monthEl ? monthEl.value : (new Date()).toISOString().slice(0, 7);
+    const curMonthStr = getUserBillsMonth();
 
     const enrolls = JSON.parse(localStorage.getItem('meal_enrollments')) || [];
     const approvedMems = enrolls.filter(e => (e.projectId || e.project_id) === curProj.id && e.status === 'approved');
@@ -678,4 +712,3 @@ if (document.readyState === 'loading') {
 } else {
   initUserApp();
 }
-window.addEventListener('apiDataLoaded', initUserApp);

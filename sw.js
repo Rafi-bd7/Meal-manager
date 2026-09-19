@@ -1,5 +1,5 @@
-// MealManager Service Worker — v6.0
-const CACHE_NAME = 'mealmanager-v6';
+// MealManager Service Worker — v7.0
+const CACHE_NAME = 'mealmanager-v7';
 const OFFLINE_URL = 'login.html';
 
 // Assets to cache immediately on install
@@ -40,7 +40,7 @@ self.addEventListener('activate', event => {
   );
 });
 
-// ── Fetch: Network-first for CSS/JS/API, Cache-first for others ───────────
+// ── Fetch: Network-first for HTML/CSS/JS/API, Cache-first for others ───────────
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
@@ -66,7 +66,7 @@ self.addEventListener('fetch', event => {
   // API calls → Network only (never cache PHP responses)
   if (url.pathname.includes('/api/') || url.pathname.endsWith('.php')) {
     event.respondWith(
-      fetch(event.request).catch(() => {
+      fetch(event.request, { cache: 'no-store' }).catch(() => {
         return new Response(JSON.stringify({ error: 'You are offline. Please check your connection.' }),
           { status: 503, headers: { 'Content-Type': 'application/json' } });
       })
@@ -74,8 +74,14 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // CSS and JS files → Network-first (so design/logic always stays fresh and never corrupted)
-  if (url.pathname.endsWith('.css') || url.pathname.endsWith('.js')) {
+  // HTML pages, CSS and JS files → Network-first (so dashboard and app logic always stay fresh)
+  if (
+    url.pathname.endsWith('.html') ||
+    url.pathname.endsWith('.css')  ||
+    url.pathname.endsWith('.js')   ||
+    url.pathname === '/'           ||
+    url.pathname.endsWith('/')
+  ) {
     event.respondWith(
       fetch(event.request).then(resp => {
         if (resp.ok) {
@@ -83,12 +89,12 @@ self.addEventListener('fetch', event => {
           caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
         }
         return resp;
-      }).catch(() => caches.match(event.request))
+      }).catch(() => caches.match(event.request).then(c => c || caches.match(OFFLINE_URL)))
     );
     return;
   }
 
-  // Other static assets (HTML, images) → Cache-first with background revalidation
+  // Other static media assets (icons, images) → Cache-first with background revalidation
   event.respondWith(
     caches.match(event.request).then(cached => {
       const networkFetch = fetch(event.request).then(resp => {
@@ -99,7 +105,7 @@ self.addEventListener('fetch', event => {
         return resp;
       }).catch(() => null);
 
-      return cached || networkFetch || caches.match(OFFLINE_URL);
+      return cached || networkFetch;
     })
   );
 });

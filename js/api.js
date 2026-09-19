@@ -11,8 +11,13 @@ const API = {
         url.searchParams.append(k, params[k]);
       }
     });
+    url.searchParams.append('_t', Date.now());
     const res = await fetch(url.toString(), {
-      headers: { 'Accept': 'application/json' }
+      cache: 'no-store',
+      headers: {
+        'Accept': 'application/json',
+        'Cache-Control': 'no-cache'
+      }
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || 'Server error');
@@ -66,6 +71,7 @@ const API = {
 
       if (changed) {
         window.dispatchEvent(new Event('storage'));
+        window.dispatchEvent(new Event('appDataSynced'));
       }
       return data;
     } catch (e) {
@@ -111,6 +117,11 @@ window.API = API;
       API.syncState();              // Immediate refresh when tab re-opens
       startPolling(6000);           // Back to normal speed
     }
+  });
+
+  // Also sync immediately when user focuses back on window
+  window.addEventListener('focus', () => {
+    if (navigator.onLine) API.syncState();
   });
 
   // Instantly sync when network comes back online
