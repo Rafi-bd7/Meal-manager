@@ -55,6 +55,15 @@ function initAdminApp() {
     }
   });
 
+  window.addEventListener('appDataSynced', () => {
+    loadProjects();
+    refresh();
+  });
+  window.addEventListener('apiDataLoaded', () => {
+    loadProjects();
+    refresh();
+  });
+
   // Tab switching logic
   const tabs = document.querySelectorAll('.tab-btn');
   const contents = document.querySelectorAll('.tab-content');
@@ -62,7 +71,8 @@ function initAdminApp() {
     tabs.forEach(t => t.classList.remove('active'));
     contents.forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
-    document.getElementById(`tab-${btn.dataset.tab}`).classList.add('active');
+    const target = document.getElementById(`tab-${btn.dataset.tab}`);
+    if (target) target.classList.add('active');
     refresh();
   }));
 
@@ -628,45 +638,125 @@ function initAdminApp() {
 
   // ─── Comments ───
   function loadComments() {
+    if (!curProjId) return;
     const comments = JSON.parse(localStorage.getItem('meal_comments')) || [];
     const users = JSON.parse(localStorage.getItem('meal_users')) || [];
     const pCom = comments.filter(c => (c.projectId || c.project_id) === curProjId).sort((a,b) => b.time - a.time);
     
-    document.getElementById('commentBadge').textContent = pCom.length || '';
+    const badge = document.getElementById('commentBadge');
+    if (badge) badge.textContent = pCom.length || '';
     const con = document.getElementById('commentsContainer');
+    if (!con) return;
     con.innerHTML = '';
     
-    if(!pCom.length) { con.innerHTML = '<p class="text-center text-muted">No comments yet.</p>'; return; }
+    if(!pCom.length) {
+      con.innerHTML = '<p class="text-center text-muted py-4"><i class="fas fa-comment-slash" style="font-size:2rem; margin-bottom:.5rem; display:block; opacity:.4;"></i>কোনো মন্তব্য নেই।</p>';
+      return;
+    }
     
     pCom.forEach(c => {
       const uid = c.userId || c.user_id;
       const u = users.find(x => x.id === uid);
-      const d = new Date(c.time).toLocaleString();
+      const name = c.userName || (u ? u.name : 'Unknown Member');
+      const d = new Date(parseInt(c.time) || Date.now()).toLocaleString('bn-BD', { dateStyle: 'medium', timeStyle: 'short' });
+      const hasReply = c.reply && c.reply.trim().length > 0;
+      const rTime = (c.replyTime || c.reply_time) ? new Date(parseInt(c.replyTime || c.reply_time)).toLocaleString('bn-BD', { dateStyle: 'medium', timeStyle: 'short' }) : '';
+      
       con.innerHTML += `
-        <div class="comment-box">
-          <div class="comment-header">
-            <div class="comment-avatar">${u ? u.name.charAt(0).toUpperCase() : '?'}</div>
-            <div class="comment-author">${u ? u.name : 'Unknown'}</div>
-            <div class="comment-time">${d}</div>
-            <button class="btn btn-outline btn-sm ms-auto btn-del-com" data-id="${c.id}" style="padding:.2rem .4rem; margin-left:auto;"><i class="fas fa-times"></i></button>
+        <div class="glass-panel" style="padding:1.15rem; border-color:rgba(79,142,247,0.3); position:relative; margin-bottom:0.75rem;">
+          <div class="flex items-center justify-between gap-2 mb-2 flex-wrap">
+            <div class="flex items-center gap-2">
+              <div class="comment-avatar" style="width:34px; height:34px; border-radius:50%; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.9rem;">
+                ${name.charAt(0).toUpperCase()}
+              </div>
+              <div>
+                <strong style="font-size:0.95rem;">${name}</strong>
+                <span style="font-size:0.75rem; color:var(--text-muted); margin-left:6px;"><i class="far fa-clock"></i> ${d}</span>
+              </div>
+            </div>
+            <button class="btn btn-danger btn-sm btn-del-com" data-id="${c.id}" title="মন্তব্য মুছুন" style="padding:.25rem .5rem; font-size:.8rem;"><i class="fas fa-trash"></i></button>
           </div>
-          <div class="comment-text">${c.text}</div>
+          
+          <div style="font-size:0.95rem; color:var(--text); line-height:1.5; white-space:pre-wrap; background:rgba(255,255,255,0.03); padding:.5rem .75rem; border-radius:6px; margin-bottom:0.75rem;">
+            ${c.text}
+          </div>
+
+          <!-- Existing Reply or Reply Box -->
+          ${hasReply ? `
+            <div style="background:rgba(34,197,94,0.08); border-left:3px solid #22c55e; border-radius:4px; padding:0.6rem 0.85rem; margin-top:0.5rem;">
+              <div class="flex items-center justify-between gap-2 mb-1 flex-wrap">
+                <span style="font-size:0.8rem; font-weight:700; color:#22c55e;"><i class="fas fa-check-circle"></i> আপনার উত্তর:</span>
+                ${rTime ? `<span style="font-size:0.72rem; color:var(--text-muted);">${rTime}</span>` : ''}
+              </div>
+              <div style="font-size:0.9rem; color:var(--text); line-height:1.4;">${c.reply}</div>
+            </div>
+          ` : `
+            <div class="reply-box mt-2" style="display:flex; gap:0.5rem; align-items:center;">
+              <input type="text" class="form-control form-control-sm reply-inp" data-id="${c.id}" placeholder="মেম্বারকে উত্তর লিখুন..." style="flex:1;">
+              <button class="btn btn-primary btn-sm btn-reply-com" data-id="${c.id}" data-uid="${uid}" style="white-space:nowrap; padding:.4rem .85rem;">
+                <i class="fas fa-reply"></i> উত্তর পাঠান
+              </button>
+            </div>
+          `}
         </div>
       `;
     });
 
-    document.querySelectorAll('.btn-del-com').forEach(b => b.addEventListener('click', async e => {
-      if(!confirm('Delete this comment?')) return;
+    // Delete comment
+    con.querySelectorAll('.btn-del-com').forEach(b => b.addEventListener('click', async e => {
+      if(!confirm('এই মন্তব্যটি মুছে ফেলতে চান?')) return;
       const cid = e.currentTarget.dataset.id;
       try {
         if (window.API) {
           await window.API.post('comments.php', { action: 'delete' }, { id: cid });
+          await window.API.syncState();
+        } else {
+          const nCom = comments.filter(x => x.id !== cid);
+          localStorage.setItem('meal_comments', JSON.stringify(nCom));
         }
-        const nCom = comments.filter(x => x.id !== cid);
-        localStorage.setItem('meal_comments', JSON.stringify(nCom));
+        showToast('মন্তব্য মুছে ফেলা হয়েছে।');
         loadComments();
       } catch (err) {
         showToast(err.message || 'Error deleting comment', 'error');
+      }
+    }));
+
+    // Send reply
+    con.querySelectorAll('.btn-reply-com').forEach(btn => btn.addEventListener('click', async e => {
+      const cid = e.currentTarget.dataset.id;
+      const uid = e.currentTarget.dataset.uid;
+      const inp = con.querySelector(`.reply-inp[data-id="${cid}"]`);
+      const replyTxt = inp ? inp.value.trim() : '';
+      if (!replyTxt) return showToast('উত্তরের লেখা লিখুন', 'error');
+
+      const origHtml = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> পাঠাচ্ছে...';
+
+      try {
+        if (window.API) {
+          await window.API.post('comments.php', { action: 'reply' }, { id: cid, reply: replyTxt });
+          // Also send a notification to the member
+          await window.API.post('notifications.php', { action: 'send' }, {
+            project_id: curProjId,
+            to_user: uid,
+            message: 'ম্যানেজার আপনার মন্তব্যের উত্তর দিয়েছেন: "' + (replyTxt.length > 40 ? replyTxt.slice(0, 37) + '...' : replyTxt) + '"'
+          }).catch(() => {});
+          await window.API.syncState();
+        } else {
+          const idx = comments.findIndex(x => x.id === cid);
+          if (idx > -1) {
+            comments[idx].reply = replyTxt;
+            comments[idx].replyTime = Date.now();
+            localStorage.setItem('meal_comments', JSON.stringify(comments));
+          }
+        }
+        showToast('উত্তর সফলভাবে পাঠানো হয়েছে! ✓');
+        loadComments();
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerHTML = origHtml;
+        showToast(err.message || 'উত্তর পাঠাতে সমস্যা হয়েছে', 'error');
       }
     }));
   }

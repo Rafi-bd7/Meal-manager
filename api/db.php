@@ -155,6 +155,12 @@ function initTables($pdo) {
         UNIQUE KEY `project_month` (`project_id`, `month_year`),
         INDEX (`project_id`)
     ) ENGINE=InnoDB");
+
+    // Auto-migrate comments reply columns
+    try {
+        $pdo->exec("ALTER TABLE `comments` ADD COLUMN IF NOT EXISTS `reply` TEXT NULL");
+        $pdo->exec("ALTER TABLE `comments` ADD COLUMN IF NOT EXISTS `reply_time` BIGINT NULL");
+    } catch (Exception $e) {}
 }
 
 

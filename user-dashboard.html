@@ -124,13 +124,16 @@
 
       <!-- Tab: Comments -->
       <div id="tab-comments" class="tab-content glass-panel">
-        <h3 style="font-size:1.05rem; margin-bottom:1.25rem;"><i class="fas fa-comment-dots" style="color:var(--primary);"></i> My Comments</h3>
-        <div id="myCommentsContainer" class="mb-3">
-          <p class="text-muted text-center">No comments yet.</p>
+        <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
+          <h3 style="font-size:1.05rem; margin:0;"><i class="fas fa-comment-dots" style="color:var(--primary);"></i> ম্যানেজারের কাছে মন্তব্য / বার্তা</h3>
+          <span class="text-muted" style="font-size:0.8rem;">আপনার পাঠানো বার্তা এবং ম্যানেজারের উত্তর</span>
         </div>
-        <div class="comment-input-area">
-          <input type="text" id="commentInput" class="form-control" placeholder="Write a comment to admin..." maxlength="300">
-          <button id="sendCommentBtn" class="btn btn-primary btn-sm"><i class="fas fa-paper-plane"></i> Send</button>
+        <div id="myCommentsContainer" class="mb-3" style="display:flex; flex-direction:column; gap:1rem; min-height:80px;">
+          <p class="text-muted text-center py-3">কোনো মন্তব্য নেই।</p>
+        </div>
+        <div class="comment-input-area" style="display:flex; gap:0.5rem; align-items:center;">
+          <input type="text" id="commentInput" class="form-control" placeholder="ম্যানেজারকে কিছু লিখুন (যেমন: খাবারের মান, রিকুয়েস্ট)..." maxlength="500">
+          <button id="sendCommentBtn" class="btn btn-primary btn-sm" style="white-space:nowrap; padding:.6rem 1.2rem;"><i class="fas fa-paper-plane"></i> পাঠান</button>
         </div>
       </div>
 

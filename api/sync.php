@@ -57,7 +57,17 @@ if ($action === 'state') {
         $r['dinner'] = (bool)$r['dinner'];
     }
 
-    $comments = $db->query("SELECT id, project_id as projectId, user_id as userId, text, time FROM comments ORDER BY time DESC")->fetchAll();
+    // Ensure comments reply columns exist
+    try {
+        $db->exec("ALTER TABLE `comments` ADD COLUMN IF NOT EXISTS `reply` TEXT NULL");
+        $db->exec("ALTER TABLE `comments` ADD COLUMN IF NOT EXISTS `reply_time` BIGINT NULL");
+    } catch (Exception $e) {}
+
+    $comments = $db->query("SELECT c.id, c.project_id as projectId, c.user_id as userId,
+        u.name as userName, c.text, c.time, c.reply, c.reply_time as replyTime
+        FROM comments c
+        LEFT JOIN users u ON c.user_id = u.id
+        ORDER BY c.time DESC")->fetchAll();
     $chats = $db->query("SELECT id, project_id as projectId, user_id as userId, user_name as userName, text, time FROM chats ORDER BY time ASC")->fetchAll();
     $notifs = $db->query("SELECT id, project_id as projectId, to_user as `to`, message, time FROM notifications ORDER BY time DESC LIMIT 100")->fetchAll();
 

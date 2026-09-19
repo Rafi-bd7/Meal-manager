@@ -1,5 +1,5 @@
-// MealManager Service Worker — v7.0
-const CACHE_NAME = 'mealmanager-v7';
+// MealManager Service Worker — v8.0
+const CACHE_NAME = 'mealmanager-v8';
 const OFFLINE_URL = 'login.html';
 
 // Assets to cache immediately on install

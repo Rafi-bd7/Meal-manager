@@ -324,51 +324,110 @@ function initUserApp() {
   // Comments
   function loadMyComments() {
     const comments = JSON.parse(localStorage.getItem('meal_comments')) || [];
-    const myCom = comments.filter(c => (c.projectId || c.project_id) === curProj.id && (c.userId || c.user_id) === cur.id).sort((a,b) => b.time - a.time);
+    const myCom = comments.filter(c => (c.projectId || c.project_id) === (curProj ? curProj.id : '') && (c.userId || c.user_id) === cur.id).sort((a,b) => b.time - a.time);
     const con = document.getElementById('myCommentsContainer');
+    if (!con) return;
     con.innerHTML = '';
     
-    if(!myCom.length) { con.innerHTML = '<p class="text-center text-muted">No comments yet.</p>'; return; }
+    if(!myCom.length) {
+      con.innerHTML = '<p class="text-center text-muted py-4"><i class="fas fa-comment-slash" style="font-size:2rem; margin-bottom:.5rem; display:block; opacity:.4;"></i>এখনো কোনো মন্তব্য পাঠানো হয়নি।</p>';
+      return;
+    }
     
     myCom.forEach(c => {
-      const d = new Date(c.time).toLocaleString();
+      const d = new Date(parseInt(c.time) || Date.now()).toLocaleString('bn-BD', { dateStyle: 'medium', timeStyle: 'short' });
+      const hasReply = c.reply && c.reply.trim().length > 0;
+      const rTime = (c.replyTime || c.reply_time) ? new Date(parseInt(c.replyTime || c.reply_time)).toLocaleString('bn-BD', { dateStyle: 'medium', timeStyle: 'short' }) : '';
+      
       con.innerHTML += `
-        <div class="comment-box">
-          <div class="comment-header">
-            <div class="comment-avatar" style="background:var(--primary);">${cur.name.charAt(0).toUpperCase()}</div>
-            <div class="comment-author">Me</div>
-            <div class="comment-time">${d}</div>
+        <div class="glass-panel" style="padding:1rem; border-color:rgba(79,142,247,0.25); position:relative; margin-bottom:0.75rem;">
+          <div class="flex items-center justify-between gap-2 mb-2 flex-wrap">
+            <div class="flex items-center gap-2">
+              <div class="comment-avatar" style="width:32px; height:32px; border-radius:50%; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.85rem;">${cur.name.charAt(0).toUpperCase()}</div>
+              <div>
+                <strong style="font-size:0.9rem;">${cur.name}</strong>
+                <span class="badge badge-blue" style="font-size:0.65rem; margin-left:4px;">You</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span style="font-size:0.75rem; color:var(--text-muted);"><i class="far fa-clock"></i> ${d}</span>
+              <button class="btn btn-danger btn-sm btn-del-my-com" data-id="${c.id}" title="মুছে ফেলুন" style="padding:.2rem .45rem; font-size:.75rem;"><i class="fas fa-trash"></i></button>
+            </div>
           </div>
-          <div class="comment-text">${c.text}</div>
+          <div style="font-size:0.92rem; color:var(--text); line-height:1.5; white-space:pre-wrap; margin-bottom:${hasReply ? '.75rem' : '0'};">${c.text}</div>
+          ${hasReply ? `
+            <div style="background:rgba(34,197,94,0.08); border-left:3px solid #22c55e; border-radius:4px; padding:0.6rem 0.85rem; margin-top:0.5rem;">
+              <div class="flex items-center justify-between gap-2 mb-1 flex-wrap">
+                <span style="font-size:0.8rem; font-weight:700; color:#22c55e;"><i class="fas fa-reply"></i> ম্যানেজারের উত্তর:</span>
+                ${rTime ? `<span style="font-size:0.72rem; color:var(--text-muted);">${rTime}</span>` : ''}
+              </div>
+              <div style="font-size:0.88rem; color:var(--text); line-height:1.4;">${c.reply}</div>
+            </div>
+          ` : `
+            <div style="margin-top:0.4rem; font-size:0.75rem; color:var(--text-muted);">
+              <i class="fas fa-check-circle" style="color:var(--primary);"></i> ম্যানেজারের নিকট পৌঁছেছে
+            </div>
+          `}
         </div>
       `;
     });
+
+    con.querySelectorAll('.btn-del-my-com').forEach(b => b.addEventListener('click', async e => {
+      if (!confirm('এই মন্তব্য মুছে ফেলবেন?')) return;
+      const cid = e.currentTarget.dataset.id;
+      try {
+        if (window.API) {
+          await window.API.post('comments.php', { action: 'delete' }, { id: cid });
+          await window.API.syncState();
+        } else {
+          const comments = JSON.parse(localStorage.getItem('meal_comments')) || [];
+          localStorage.setItem('meal_comments', JSON.stringify(comments.filter(x => x.id !== cid)));
+        }
+        showToast('মন্তব্য মুছে ফেলা হয়েছে।');
+        loadMyComments();
+      } catch (err) {
+        showToast(err.message || 'Error deleting comment', 'error');
+      }
+    }));
   }
 
   document.getElementById('sendCommentBtn')?.addEventListener('click', async () => {
     const inp = document.getElementById('commentInput');
     const txt = inp.value.trim();
-    if(!txt) return showToast('Please write something', 'error');
-    if(!curProj) return;
+    if(!txt) return showToast('মন্তব্য লিখুন', 'error');
+    if(!curProj) return showToast('কোনো প্রজেক্ট সিলেক্ট করা নেই', 'error');
+
+    const btn = document.getElementById('sendCommentBtn');
+    const origText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> পাঠাচ্ছে...';
 
     try {
       if (window.API) {
         await window.API.post('comments.php', { action: 'create' }, { project_id: curProj.id, user_id: cur.id, text: txt });
+        await window.API.syncState();
+      } else {
+        const comments = JSON.parse(localStorage.getItem('meal_comments')) || [];
+        const cObj = { id: Date.now().toString(), projectId: curProj.id, userId: cur.id, text: txt, time: Date.now() };
+        comments.unshift(cObj);
+        localStorage.setItem('meal_comments', JSON.stringify(comments));
       }
-      const comments = JSON.parse(localStorage.getItem('meal_comments')) || [];
-      const cObj = { id: Date.now().toString(), projectId: curProj.id, userId: cur.id, text: txt, time: Date.now() };
-      comments.push(cObj);
-      localStorage.setItem('meal_comments', JSON.stringify(comments));
       inp.value = '';
-      showToast('Comment sent to admin!');
+      showToast('মন্তব্য সফলভাবে ম্যানেজারের কাছে পাঠানো হয়েছে! ✓');
       loadMyComments();
     } catch (err) {
-      showToast(err.message || 'Failed to send comment', 'error');
+      showToast(err.message || 'মন্তব্য পাঠাতে সমস্যা হয়েছে', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = origText;
     }
   });
-  
+
   document.getElementById('commentInput')?.addEventListener('keydown', e => {
-    if(e.key === 'Enter') document.getElementById('sendCommentBtn').click();
+    if(e.key === 'Enter') {
+      e.preventDefault();
+      document.getElementById('sendCommentBtn')?.click();
+    }
   });
 
   // Menu
