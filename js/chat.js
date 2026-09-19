@@ -7,21 +7,6 @@
     const s = document.createElement('style');
     s.id = 'chatStyles';
     s.textContent = `
-      @keyframes chatPulse {
-        0%   { box-shadow: 0 0 0 0 rgba(0, 132, 255, 0.7); }
-        70%  { box-shadow: 0 0 0 16px rgba(0, 132, 255, 0); }
-        100% { box-shadow: 0 0 0 0 rgba(0, 132, 255, 0); }
-      }
-      @keyframes chatSlideUp {
-        from { opacity: 0; transform: translateY(20px) scale(0.95); }
-        to   { opacity: 1; transform: translateY(0) scale(1); }
-      }
-      @keyframes bounceIn {
-        0%   { transform: scale(0.8); opacity: 0; }
-        60%  { transform: scale(1.05); opacity: 1; }
-        100% { transform: scale(1); }
-      }
-
       /* Floating Action Button (Launcher) */
       #chatFab {
         position: fixed; bottom: 26px; right: 26px;
@@ -31,7 +16,6 @@
         display: flex !important; align-items: center; justify-content: center;
         cursor: pointer; z-index: 99998;
         box-shadow: 0 6px 24px rgba(0, 132, 255, 0.45);
-        animation: chatPulse 2.2s infinite;
         transition: transform .2s cubic-bezier(.34,1.56,.64,1);
         border: none; outline: none;
       }
@@ -122,7 +106,6 @@
       .cm-row {
         display: flex; gap: 8px; width: 100%;
         align-items: flex-end; position: relative;
-        animation: bounceIn 0.2s ease-out;
       }
       .cm-row.me { justify-content: flex-end; }
       .cm-row.you { justify-content: flex-start; }
@@ -393,6 +376,7 @@
   let activeGetProjId = null;
   let isBoxOpen = false;
   let lastSeenCount = 0;
+  let lastRenderedSig = '';
 
   // Global helper for opening lightbox
   window.openChatLightbox = function (src) {
@@ -510,12 +494,13 @@
 
   refreshBtn.addEventListener('click', async () => {
     refreshBtn.querySelector('i').classList.add('fa-spin');
+    lastRenderedSig = '';
     if (activeGetProjId) await fetchDirectFromDB(activeGetProjId());
     setTimeout(() => refreshBtn.querySelector('i').classList.remove('fa-spin'), 600);
   });
 
   // Render chat messages into the DOM
-  function renderChat(curUser, projId) {
+  function renderChat(curUser, projId, force = false) {
     if (!projId) {
       fab.setAttribute('data-hidden', '1');
       box.setAttribute('data-hidden', '1');
@@ -548,6 +533,13 @@
     } else if (lastSeenCount === 0) {
       lastSeenCount = mine.length;
     }
+
+    // Prevent unnecessary DOM redraws and flicker when messages have not changed
+    const sig = String(projId) + '::' + (curUser ? curUser.id : '') + '::' + mine.map(c => `${c.id}_${c.time}_${c.text || ''}_${c.image ? 'img' : ''}`).join('|');
+    if (!force && sig === lastRenderedSig) {
+      return;
+    }
+    lastRenderedSig = sig;
 
     const atBottom = msgs.scrollHeight - msgs.clientHeight <= msgs.scrollTop + 60;
     const users = JSON.parse(localStorage.getItem('meal_users') || '[]');
@@ -652,7 +644,7 @@
       const allChats = JSON.parse(localStorage.getItem('meal_chats') || '[]');
       const filtered = allChats.filter(c => String(c.id) !== String(msgId));
       localStorage.setItem('meal_chats', JSON.stringify(filtered));
-      renderChat(activeCurUser, projId);
+      renderChat(activeCurUser, projId, true);
 
       if (window.API) {
         await window.API.post('chats.php', { action: 'delete' }, { id: msgId, project_id: projId });
@@ -717,7 +709,7 @@
     imgTray.style.display = 'none';
     emojiBar.style.display = 'none';
     updateSendIcon();
-    renderChat(curUser, pid);
+    renderChat(curUser, pid, true);
     msgs.scrollTop = msgs.scrollHeight;
 
     // 2. Persist to API and sync with database
@@ -767,7 +759,10 @@
 
     // Event listeners
     window.addEventListener('refreshChat', refresh);
-    window.addEventListener('appDataSynced', refresh);
+    window.addEventListener('appDataSynced', () => {
+      lastRenderedSig = '';
+      refresh();
+    });
     window.addEventListener('storage', e => {
       if (!e.key || e.key === 'meal_chats') refresh();
     });
