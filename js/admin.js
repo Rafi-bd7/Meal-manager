@@ -76,6 +76,28 @@ function initAdminApp() {
     refresh();
   }));
 
+  // ─── Global State & Field Definitions ─────────────────────────────────────
+  const _tzOffsetMs = (new Date()).getTimezoneOffset() * 60000;
+  const _todayStr = (new Date(Date.now() - _tzOffsetMs)).toISOString().slice(0, 10);
+  const _curMonthStr = _todayStr.slice(0, 7);
+
+  const billFields = [
+    { id: 'billHouseRent',   key: 'house_rent',        jsKey: 'houseRent',        name: '🏠 বাড়ি ভাড়া (House Rent)' },
+    { id: 'billCookSalary',  key: 'cook_salary',       jsKey: 'cookSalary',       name: '👩‍🍳 রান্নার বুয়া/খালার বেতন (Cook Salary)' },
+    { id: 'billWifi',        key: 'wifi_bill',         jsKey: 'wifiBill',         name: '📶 ওয়াই-ফাই বিল (Wi-Fi)' },
+    { id: 'billGas',         key: 'gas_bill',          jsKey: 'gasBill',          name: '🔥 গ্যাস বিল (Gas)' },
+    { id: 'billElectricity', key: 'electricity_bill',  jsKey: 'electricityBill',  name: '⚡ বিদ্যুৎ বিল (Electricity)' },
+    { id: 'billGarbage',     key: 'garbage_bill',      jsKey: 'garbageBill',      name: '🗑️ ময়লার বিল (Garbage)' }
+  ];
+
+  let customBills = []; // [{ id, name, amount }]
+
+  function getApprovedMemberCount() {
+    const enrolls = JSON.parse(localStorage.getItem('meal_enrollments')) || [];
+    const count = enrolls.filter(e => String(e.projectId || e.project_id) === String(curProjId) && e.status === 'approved').length;
+    return count > 0 ? count : 1;
+  }
+
   // Projects logic
   let curProjId = localStorage.getItem('meal_adminLastProj') || '';
 
@@ -965,17 +987,27 @@ function initAdminApp() {
   }
 
   // ─── Bazaar / Daily Market Expenses ─────────────────────────────────────
-  const _tzOffsetMs = (new Date()).getTimezoneOffset() * 60000;
-  const _todayStr = (new Date(Date.now() - _tzOffsetMs)).toISOString().slice(0, 10);
-  const _curMonthStr = _todayStr.slice(0, 7);
-
   let _adminBazaarInited = false;
   function initExpenseControls() {
     const bm = document.getElementById('bazaarMonth');
     const bim = document.getElementById('billsMonth');
     const ed = document.getElementById('expDate');
-    if (bm && !bm._inited) { bm.value = _curMonthStr; bm.addEventListener('change', loadBazaar); bm._inited = true; }
-    if (bim && !bim._inited) { bim.value = _curMonthStr; bim.addEventListener('change', loadBills); bim._inited = true; }
+    if (bm && !bm._inited) {
+      if (!bm.value) bm.value = _curMonthStr;
+      bm.addEventListener('change', () => {
+        bm.dataset.userChanged = 'true';
+        loadBazaar();
+      });
+      bm._inited = true;
+    }
+    if (bim && !bim._inited) {
+      if (!bim.value) bim.value = _curMonthStr;
+      bim.addEventListener('change', () => {
+        bim.dataset.userChanged = 'true';
+        loadBills();
+      });
+      bim._inited = true;
+    }
     if (ed && !ed.value) ed.value = _todayStr;
 
     if (!_adminBazaarInited) {
@@ -1007,6 +1039,17 @@ function initAdminApp() {
         btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> সেভ হচ্ছে...';
 
         try {
+          // Immediately update localStorage
+          const expenses = JSON.parse(localStorage.getItem('meal_expenses')) || [];
+          const idx = expenses.findIndex(x => x.id === id);
+          if (idx > -1) {
+            expenses[idx] = { ...expenses[idx], date, item, amount, category, note };
+            localStorage.setItem('meal_expenses', JSON.stringify(expenses));
+          }
+          document.getElementById('editExpModal')?.classList.remove('active');
+          showToast('বাজার খরচের তথ্য সফলভাবে আপডেট হয়েছে! ✓');
+          loadBazaar();
+
           if (window.API) {
             await window.API.post('expenses.php', { action: 'update' }, {
               id,
@@ -1018,17 +1061,8 @@ function initAdminApp() {
               note
             });
             await window.API.syncState();
-          } else {
-            const expenses = JSON.parse(localStorage.getItem('meal_expenses')) || [];
-            const idx = expenses.findIndex(x => x.id === id);
-            if (idx > -1) {
-              expenses[idx] = { ...expenses[idx], date, item, amount, category, note };
-              localStorage.setItem('meal_expenses', JSON.stringify(expenses));
-            }
+            loadBazaar();
           }
-          document.getElementById('editExpModal')?.classList.remove('active');
-          showToast('বাজার খরচের তথ্য সফলভাবে আপডেট হয়েছে! ✓');
-          loadBazaar();
         } catch (err) {
           showToast(err.message || 'Error updating expense', 'error');
         } finally {
@@ -1044,19 +1078,27 @@ function initAdminApp() {
     initExpenseControls();
     if (!curProjId) return;
     const bazaarMonthEl = document.getElementById('bazaarMonth');
-    const month = bazaarMonthEl ? bazaarMonthEl.value : _curMonthStr;
     const expenses = JSON.parse(localStorage.getItem('meal_expenses')) || [];
     const users    = JSON.parse(localStorage.getItem('meal_users')) || [];
 
-    const filtered = expenses.filter(ex => {
-      const epid = ex.projectId || ex.project_id;
-      const edate = ex.date || '';
-      return epid === curProjId && edate.startsWith(month);
-    });
+    const projExpenses = expenses.filter(ex => String(ex.projectId || ex.project_id) === String(curProjId));
+
+    let month = bazaarMonthEl && bazaarMonthEl.value ? bazaarMonthEl.value : _curMonthStr;
+    let filtered = projExpenses.filter(ex => (ex.date || '').startsWith(month));
+
+    // Auto-detect latest month with expenses if current selected month has none
+    if (bazaarMonthEl && bazaarMonthEl.dataset.userChanged !== 'true' && projExpenses.length > 0 && filtered.length === 0) {
+      const sorted = [...projExpenses].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+      if (sorted[0] && sorted[0].date) {
+        month = sorted[0].date.slice(0, 7);
+        bazaarMonthEl.value = month;
+        filtered = projExpenses.filter(ex => (ex.date || '').startsWith(month));
+      }
+    }
 
     const today = _todayStr;
     const totalMonth = filtered.reduce((s, ex) => s + parseFloat(ex.amount || 0), 0);
-    const totalToday = filtered.filter(ex => ex.date === today).reduce((s, ex) => s + parseFloat(ex.amount || 0), 0);
+    const totalToday = projExpenses.filter(ex => ex.date === today).reduce((s, ex) => s + parseFloat(ex.amount || 0), 0);
 
     const elM = document.getElementById('bazaarTotalMonth');
     const elT = document.getElementById('bazaarTotalToday');
@@ -1069,7 +1111,7 @@ function initAdminApp() {
     if (!body) return;
     body.innerHTML = '';
     if (!filtered.length) {
-      body.innerHTML = '<tr><td colspan="7" class="text-center text-muted" style="padding:2rem;">এই মাসে কোনো বাজার খরচের এন্ট্রি নেই।</td></tr>';
+      body.innerHTML = `<tr><td colspan="7" class="text-center text-muted" style="padding:2rem;"><i class="fas fa-shopping-basket" style="opacity:.4; font-size:2rem; display:block; margin-bottom:.5rem;"></i>${month} মাসে কোনো বাজার খরচের এন্ট্রি নেই।</td></tr>`;
     } else {
       // Sort by date desc
       [...filtered].sort((a, b) => b.date.localeCompare(a.date)).forEach(ex => {
@@ -1108,7 +1150,7 @@ function initAdminApp() {
     // Edit expense event
     body.querySelectorAll('.btn-edit-exp').forEach(btn => btn.addEventListener('click', e => {
       const eid = e.currentTarget.dataset.id;
-      const ex = filtered.find(x => x.id === eid);
+      const ex = projExpenses.find(x => x.id === eid);
       if (!ex) return;
       document.getElementById('editExpId').value = ex.id;
       document.getElementById('editExpDate').value = ex.date;
@@ -1124,18 +1166,21 @@ function initAdminApp() {
       if (!confirm('এই খরচের এন্ট্রি মুছে ফেলবেন?')) return;
       const eid = e.currentTarget.dataset.id;
       try {
+        const exps = JSON.parse(localStorage.getItem('meal_expenses')) || [];
+        localStorage.setItem('meal_expenses', JSON.stringify(exps.filter(x => x.id !== eid)));
+        showToast('খরচ মুছে ফেলা হয়েছে।');
+        loadBazaar();
+
         if (window.API) {
           await window.API.post('expenses.php', { action: 'delete' }, { id: eid, project_id: curProjId });
           await window.API.syncState();
-        } else {
-          const exps = JSON.parse(localStorage.getItem('meal_expenses')) || [];
-          localStorage.setItem('meal_expenses', JSON.stringify(exps.filter(x => x.id !== eid)));
+          loadBazaar();
         }
-        showToast('খরচ মুছে ফেলা হয়েছে।');
-        loadBazaar();
       } catch (err) { showToast(err.message || 'Error deleting expense', 'error'); }
     }));
   }
+
+  window.loadBazaar = loadBazaar;
 
   // Add expense button
   document.getElementById('addExpenseBtn')?.addEventListener('click', async () => {
@@ -1149,43 +1194,55 @@ function initAdminApp() {
     if (!item) return showToast('পণ্যের নাম লিখুন', 'error');
     if (amount <= 0) return showToast('সঠিক টাকার পরিমাণ দিন', 'error');
 
+    const addBtn = document.getElementById('addExpenseBtn');
+    const origText = addBtn ? addBtn.innerHTML : '';
+    if (addBtn) { addBtn.disabled = true; addBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> যোগ হচ্ছে...'; }
+
     try {
-      if (window.API) {
-        await window.API.post('expenses.php', { action: 'add' }, {
-          project_id: curProjId, user_id: cur.id,
-          date, item, amount, category: cat, note
-        });
-        await window.API.syncState();
-      } else {
-        const exps = JSON.parse(localStorage.getItem('meal_expenses')) || [];
-        exps.push({ id: 'exp_' + Date.now(), projectId: curProjId, userId: cur.id, userName: cur.name, date, item, amount, category: cat, note });
-        localStorage.setItem('meal_expenses', JSON.stringify(exps));
-      }
+      const newExp = {
+        id: 'exp_' + Date.now(),
+        projectId: curProjId,
+        userId: cur.id,
+        userName: cur.name,
+        date,
+        item,
+        amount,
+        category: cat,
+        note
+      };
+
+      // 1. Immediately update localStorage
+      const exps = JSON.parse(localStorage.getItem('meal_expenses')) || [];
+      exps.unshift(newExp);
+      localStorage.setItem('meal_expenses', JSON.stringify(exps));
+
+      // 2. Clear inputs & re-render
       document.getElementById('expItem').value = '';
       document.getElementById('expAmount').value = '';
       document.getElementById('expNote').value = '';
       showToast('খরচ সফলভাবে যোগ করা হয়েছে! 🛒');
       loadBazaar();
+
+      // 3. Persist to API
+      if (window.API) {
+        const res = await window.API.post('expenses.php', { action: 'add' }, {
+          project_id: curProjId, user_id: cur.id,
+          date, item, amount, category: cat, note
+        });
+        if (res && res.expense && res.expense.id) {
+          newExp.id = res.expense.id;
+          localStorage.setItem('meal_expenses', JSON.stringify(exps));
+        }
+        await window.API.syncState();
+        loadBazaar();
+      }
     } catch (err) { showToast(err.message || 'Error adding expense', 'error'); }
+    finally {
+      if (addBtn) { addBtn.disabled = false; addBtn.innerHTML = origText; }
+    }
   });
 
-  // ─── Monthly Bills ─────────────────────────────────────────────────────
-  const billFields = [
-    { id: 'billHouseRent',   key: 'house_rent',        jsKey: 'houseRent',        name: '🏠 বাড়ি ভাড়া (House Rent)' },
-    { id: 'billCookSalary',  key: 'cook_salary',       jsKey: 'cookSalary',       name: '👩‍🍳 রান্নার বুয়া/খালার বেতন (Cook Salary)' },
-    { id: 'billWifi',        key: 'wifi_bill',         jsKey: 'wifiBill',         name: '📶 ওয়াই-ফাই বিল (Wi-Fi)' },
-    { id: 'billGas',         key: 'gas_bill',          jsKey: 'gasBill',          name: '🔥 গ্যাস বিল (Gas)' },
-    { id: 'billElectricity', key: 'electricity_bill',  jsKey: 'electricityBill',  name: '⚡ বিদ্যুৎ বিল (Electricity)' },
-    { id: 'billGarbage',     key: 'garbage_bill',      jsKey: 'garbageBill',      name: '🗑️ ময়লার বিল (Garbage)' }
-  ];
-
-  let customBills = []; // [{ id, name, amount }]
-
-  function getApprovedMemberCount() {
-    const enrolls = JSON.parse(localStorage.getItem('meal_enrollments')) || [];
-    const count = enrolls.filter(e => (e.projectId || e.project_id) === curProjId && e.status === 'approved').length;
-    return count > 0 ? count : 1;
-  }
+  // ─── Monthly Bills (Definitions hoisted to top of initAdminApp) ──────────
 
   function renderCustomBills() {
     const container = document.getElementById('customBillsContainer');

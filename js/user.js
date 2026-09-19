@@ -365,7 +365,10 @@ function initUserApp() {
         const tzOffset = (new Date()).getTimezoneOffset() * 60000;
         bMonth.value = (new Date(Date.now() - tzOffset)).toISOString().slice(0, 7);
       }
-      bMonth.addEventListener('change', () => loadBazaar());
+      bMonth.addEventListener('change', () => {
+        bMonth.dataset.userChanged = 'true';
+        loadBazaar();
+      });
     }
 
     const expDate = document.getElementById('expDate');
@@ -398,8 +401,33 @@ function initUserApp() {
       btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> যোগ হচ্ছে...';
 
       try {
+        const newExp = {
+          id: 'exp_' + Date.now(),
+          projectId: curProj.id,
+          userId: cur.id,
+          userName: cur.name,
+          date,
+          item,
+          amount,
+          category,
+          note
+        };
+
+        // 1. Immediately update localStorage for instant UI response
+        const expenses = JSON.parse(localStorage.getItem('meal_expenses')) || [];
+        expenses.unshift(newExp);
+        localStorage.setItem('meal_expenses', JSON.stringify(expenses));
+
+        // 2. Clear inputs & re-render immediately
+        if (itemInp) itemInp.value = '';
+        if (amountInp) amountInp.value = '';
+        if (noteInp) noteInp.value = '';
+        showToast('বাজার খরচ সফলভাবে যোগ করা হয়েছে! ✓');
+        loadBazaar();
+
+        // 3. Persist to API
         if (window.API) {
-          await window.API.post('expenses.php', { action: 'add' }, {
+          const res = await window.API.post('expenses.php', { action: 'add' }, {
             project_id: curProj.id,
             user_id: cur.id,
             date,
@@ -408,28 +436,13 @@ function initUserApp() {
             category,
             note
           });
+          if (res && res.expense && res.expense.id) {
+            newExp.id = res.expense.id;
+            localStorage.setItem('meal_expenses', JSON.stringify(expenses));
+          }
           await window.API.syncState();
-        } else {
-          const expenses = JSON.parse(localStorage.getItem('meal_expenses')) || [];
-          expenses.unshift({
-            id: 'exp_' + Date.now(),
-            projectId: curProj.id,
-            userId: cur.id,
-            userName: cur.name,
-            date,
-            item,
-            amount,
-            category,
-            note
-          });
-          localStorage.setItem('meal_expenses', JSON.stringify(expenses));
+          loadBazaar();
         }
-
-        if (itemInp) itemInp.value = '';
-        if (amountInp) amountInp.value = '';
-        if (noteInp) noteInp.value = '';
-        showToast('বাজার খরচ সফলভাবে যোগ করা হয়েছে! ✓');
-        loadBazaar();
       } catch (err) {
         showToast(err.message || 'Error adding expense', 'error');
       } finally {
@@ -465,6 +478,17 @@ function initUserApp() {
       btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> সেভ হচ্ছে...';
 
       try {
+        // Immediately update localStorage
+        const expenses = JSON.parse(localStorage.getItem('meal_expenses')) || [];
+        const idx = expenses.findIndex(x => x.id === id);
+        if (idx > -1) {
+          expenses[idx] = { ...expenses[idx], date, item, amount, category, note };
+          localStorage.setItem('meal_expenses', JSON.stringify(expenses));
+        }
+        document.getElementById('editExpModal')?.classList.remove('active');
+        showToast('বাজার খরচের তথ্য সফলভাবে আপডেট হয়েছে! ✓');
+        loadBazaar();
+
         if (window.API) {
           await window.API.post('expenses.php', { action: 'update' }, {
             id,
@@ -476,17 +500,8 @@ function initUserApp() {
             note
           });
           await window.API.syncState();
-        } else {
-          const expenses = JSON.parse(localStorage.getItem('meal_expenses')) || [];
-          const idx = expenses.findIndex(x => x.id === id);
-          if (idx > -1) {
-            expenses[idx] = { ...expenses[idx], date, item, amount, category, note };
-            localStorage.setItem('meal_expenses', JSON.stringify(expenses));
-          }
+          loadBazaar();
         }
-        document.getElementById('editExpModal')?.classList.remove('active');
-        showToast('বাজার খরচের তথ্য সফলভাবে আপডেট হয়েছে! ✓');
-        loadBazaar();
       } catch (err) {
         showToast(err.message || 'Error updating expense', 'error');
       } finally {
@@ -501,17 +516,27 @@ function initUserApp() {
     initBazaarEvents();
 
     const bMonth = document.getElementById('bazaarMonth');
-    const monthStr = bMonth && bMonth.value ? bMonth.value : (new Date()).toISOString().slice(0, 7);
+    const expenses = JSON.parse(localStorage.getItem('meal_expenses')) || [];
+    const projExpenses = expenses.filter(x => String(x.projectId || x.project_id) === String(curProj.id));
 
     const tzOffset = (new Date()).getTimezoneOffset() * 60000;
     const todayStr = (new Date(Date.now() - tzOffset)).toISOString().slice(0, 10);
+    const defaultMonth = todayStr.slice(0, 7);
 
-    const expenses = JSON.parse(localStorage.getItem('meal_expenses')) || [];
-    const projExpenses = expenses.filter(x => (x.projectId || x.project_id) === curProj.id);
-    
-    // Month filter
-    const monthExpenses = projExpenses.filter(x => (x.date || '').slice(0, 7) === monthStr)
-                                      .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    let monthStr = bMonth && bMonth.value ? bMonth.value : defaultMonth;
+    let monthExpenses = projExpenses.filter(x => (x.date || '').slice(0, 7) === monthStr)
+                                    .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+    // Auto-detect latest month with expenses if selected month has none
+    if (bMonth && bMonth.dataset.userChanged !== 'true' && projExpenses.length > 0 && monthExpenses.length === 0) {
+      const sortedExps = [...projExpenses].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+      if (sortedExps[0] && sortedExps[0].date) {
+        monthStr = sortedExps[0].date.slice(0, 7);
+        bMonth.value = monthStr;
+        monthExpenses = projExpenses.filter(x => (x.date || '').slice(0, 7) === monthStr)
+                                    .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+      }
+    }
 
     // Stats
     const totalMonth = monthExpenses.reduce((sum, x) => sum + (parseFloat(x.amount) || 0), 0);
@@ -583,16 +608,16 @@ function initUserApp() {
         const id = e.currentTarget.dataset.id;
         if (!confirm('আপনি কি নিশ্চিত যে এই বাজার খরচের এন্ট্রি মুছে ফেলতে চান?')) return;
         try {
-          if (window.API) {
-            await window.API.post('expenses.php', { action: 'delete' }, { id });
-            await window.API.syncState();
-          } else {
-            let expenses = JSON.parse(localStorage.getItem('meal_expenses')) || [];
-            expenses = expenses.filter(x => x.id !== id);
-            localStorage.setItem('meal_expenses', JSON.stringify(expenses));
-          }
+          const exps = JSON.parse(localStorage.getItem('meal_expenses')) || [];
+          localStorage.setItem('meal_expenses', JSON.stringify(exps.filter(x => x.id !== id)));
           showToast('বাজার খরচের এন্ট্রি মুছে ফেলা হয়েছে।');
           loadBazaar();
+
+          if (window.API) {
+            await window.API.post('expenses.php', { action: 'delete' }, { id, project_id: curProj.id });
+            await window.API.syncState();
+            loadBazaar();
+          }
         } catch (err) {
           showToast(err.message || 'Error deleting expense', 'error');
         }
