@@ -36,6 +36,8 @@ $isLocal = in_array($_SERVER['SERVER_NAME'] ?? '', ['localhost', '127.0.0.1']) |
            in_array($_SERVER['HTTP_HOST'] ?? '', ['localhost', '127.0.0.1']) ||
            (php_sapi_name() === 'cli-server');
 
+$serverHost = $_SERVER['HTTP_HOST'] ?? ($_SERVER['SERVER_NAME'] ?? '');
+
 if ($envHost) {
     // Cloud / Render Environment Variables
     $host   = $envHost;
@@ -43,6 +45,13 @@ if ($envHost) {
     $user   = $envUser;
     $pass   = $envPass;
     $dbname = $envName;
+} elseif (strpos($serverHost, 'alwaysdata.net') !== false || file_exists('/home/mealmanager')) {
+    // Alwaysdata Hosting
+    $host   = 'mysql-mealmanager.alwaysdata.net';
+    $port   = '3306';
+    $user   = 'mealmanager';
+    $pass   = '@@mealmanager@@';
+    $dbname = 'mealmanager_meals';
 } elseif ($isLocal) {
     $host   = '127.0.0.1';
     $port   = '3306';
@@ -50,11 +59,12 @@ if ($envHost) {
     $pass   = '';
     $dbname = 'meal_manager_db';
 } else {
-    $host   = 'sql107.infinityfree.com';
+    // Fallback to Alwaysdata if hosted
+    $host   = 'mysql-mealmanager.alwaysdata.net';
     $port   = '3306';
-    $user   = 'if0_42956447';
-    $pass   = 'bMCYO8YzER31wH';
-    $dbname = 'if0_42956447_meals';
+    $user   = 'mealmanager';
+    $pass   = '@@mealmanager@@';
+    $dbname = 'mealmanager_meals';
 }
 // ──────────────────────────────────────────────────────────────────────
 
@@ -62,7 +72,7 @@ if ($envHost) {
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') { http_response_code(200); exit; }
 
 function getDB() {
     global $host, $port, $user, $pass, $dbname, $isLocal;

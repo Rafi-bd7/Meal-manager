@@ -40,7 +40,7 @@ function initAdminApp() {
 
   window.addEventListener('storage', e => {
     if (!e.key || e.key === 'meal_projects') loadProjects();
-    if (!e.key || ['meal_records','meal_enrollments','meal_projects','meal_comments'].includes(e.key)) refresh();
+    if (!e.key || ['meal_records','meal_enrollments','meal_projects','meal_comments','meal_bills','meal_expenses'].includes(e.key)) refresh();
     
     if (!e.key || e.key === 'meal_notifications') {
       const notifs = JSON.parse(localStorage.getItem('meal_notifications')) || [];
@@ -1167,14 +1167,17 @@ function initAdminApp() {
 
   function loadBills() {
     if (!curProjId) return;
-    const month = billsMonthEl ? billsMonthEl.value : _curMonthStr;
+    const billsMonthEl = document.getElementById('billsMonth');
+    const month = billsMonthEl && billsMonthEl.value ? billsMonthEl.value : _curMonthStr;
     const bills = JSON.parse(localStorage.getItem('meal_bills')) || [];
     const b = bills.find(x => (x.projectId || x.project_id) === curProjId && (x.monthYear || x.month_year) === month);
 
     if (b) {
       billFields.forEach(f => {
         const el = document.getElementById(f.id);
-        if (el) el.value = parseFloat(b[f.jsKey] || b[f.key] || 0) || '';
+        const rawVal = b[f.jsKey] !== undefined ? b[f.jsKey] : b[f.key];
+        const val = parseFloat(rawVal || 0);
+        if (el) el.value = val > 0 ? val : (rawVal !== undefined && rawVal !== null && rawVal !== '' ? val : '');
       });
 
       // Parse custom bills
@@ -1233,7 +1236,8 @@ function initAdminApp() {
 
   document.getElementById('saveBillsBtn')?.addEventListener('click', async () => {
     if (!curProjId) return showToast('প্রথমে একটি প্রজেক্ট সিলেক্ট করুন', 'error');
-    const month = billsMonthEl ? billsMonthEl.value : _curMonthStr;
+    const billsMonthEl = document.getElementById('billsMonth');
+    const month = billsMonthEl && billsMonthEl.value ? billsMonthEl.value : _curMonthStr;
 
     let customTotal = 0;
     customBills.forEach(cb => { customTotal += (parseFloat(cb.amount) || 0); });
@@ -1246,21 +1250,27 @@ function initAdminApp() {
     };
     billFields.forEach(f => { payload[f.key] = parseFloat(document.getElementById(f.id)?.value || 0); });
 
+    // Update local storage immediately
+    const bills = JSON.parse(localStorage.getItem('meal_bills')) || [];
+    const idx = bills.findIndex(x => (x.projectId || x.project_id) === curProjId && (x.monthYear || x.month_year) === month);
+    const newBill = { projectId: curProjId, monthYear: month, ...payload };
+    billFields.forEach(f => { newBill[f.jsKey] = payload[f.key]; });
+    newBill.otherBills = payload.other_bills;
+    newBill.otherBillsNote = payload.other_bills_note;
+    if (idx > -1) bills[idx] = newBill; else bills.push(newBill);
+    localStorage.setItem('meal_bills', JSON.stringify(bills));
+
     try {
       if (window.API) {
         await window.API.post('bills.php', { action: 'save' }, payload);
         await window.API.syncState();
-      } else {
-        const bills = JSON.parse(localStorage.getItem('meal_bills')) || [];
-        const idx = bills.findIndex(x => (x.projectId || x.project_id) === curProjId && (x.monthYear || x.month_year) === month);
-        const newBill = { projectId: curProjId, monthYear: month, ...payload };
-        billFields.forEach(f => { newBill[f.jsKey] = payload[f.key]; });
-        if (idx > -1) bills[idx] = newBill; else bills.push(newBill);
-        localStorage.setItem('meal_bills', JSON.stringify(bills));
       }
       showToast('মাসিক বিল ও সকল খাতের হিসাব সফলভাবে সেভ করা হয়েছে! ✓');
       loadBills();
-    } catch (err) { showToast(err.message || 'Error saving bills', 'error'); }
+    } catch (err) { 
+      console.error('Error saving bills:', err);
+      showToast(err.message || 'Error saving bills', 'error'); 
+    }
   });
 
   // ─── Download Bills PDF ───
@@ -1268,7 +1278,8 @@ function initAdminApp() {
     const area = document.getElementById('billsPdfArea');
     if (!area) return;
 
-    const month = billsMonthEl ? billsMonthEl.value : _curMonthStr;
+    const billsMonthEl = document.getElementById('billsMonth');
+    const month = billsMonthEl && billsMonthEl.value ? billsMonthEl.value : _curMonthStr;
     const projects = JSON.parse(localStorage.getItem('meal_projects')) || [];
     const p = projects.find(x => x.id === curProjId);
     const memCount = getApprovedMemberCount();
