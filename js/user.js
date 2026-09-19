@@ -36,6 +36,23 @@ window.toggleMeal = function(type) {
   if(window.autoSaveMeal) window.autoSaveMeal();
 };
 
+// ─── Monthly Bill Field Definitions & Helpers (Global) ───────────────────────
+const userBillDefs = [
+  { key: 'houseRent', altKey: 'house_rent', name: 'বাড়ি ভাড়া (House Rent)', icon: 'fa-home' },
+  { key: 'cookSalary', altKey: 'cook_salary', name: 'খালা / বাবুর্চি বিল (Cook Salary)', icon: 'fa-utensils' },
+  { key: 'wifiBill', altKey: 'wifi_bill', name: 'ওয়াইফাই বিল (WiFi)', icon: 'fa-wifi' },
+  { key: 'gasBill', altKey: 'gas_bill', name: 'গ্যাস বিল (Gas)', icon: 'fa-burn' },
+  { key: 'electricityBill', altKey: 'electricity_bill', name: 'বিদ্যুৎ বিল (Electricity)', icon: 'fa-bolt' },
+  { key: 'garbageBill', altKey: 'garbage_bill', name: 'ময়লা বিল (Garbage)', icon: 'fa-trash-alt' }
+];
+
+function getBillVal(obj, key1, key2) {
+  if (!obj) return 0;
+  if (obj[key1] !== undefined && obj[key1] !== null && obj[key1] !== '') return parseFloat(obj[key1]) || 0;
+  if (obj[key2] !== undefined && obj[key2] !== null && obj[key2] !== '') return parseFloat(obj[key2]) || 0;
+  return 0;
+}
+
 function initUserApp() {
   const cur = JSON.parse(localStorage.getItem('meal_currentUser'));
   if (!cur || cur.role !== 'user') {
@@ -709,24 +726,15 @@ function initUserApp() {
   });
 
   // ─── Monthly Bills (User View, Per-person Breakdown & PDF) ───
-  const userBillDefs = [
-    { key: 'houseRent', altKey: 'house_rent', name: 'বাড়ি ভাড়া (House Rent)', icon: 'fa-home' },
-    { key: 'cookSalary', altKey: 'cook_salary', name: 'খালা / বাবুর্চি বিল (Cook Salary)', icon: 'fa-utensils' },
-    { key: 'wifiBill', altKey: 'wifi_bill', name: 'ওয়াইফাই বিল (WiFi)', icon: 'fa-wifi' },
-    { key: 'gasBill', altKey: 'gas_bill', name: 'গ্যাস বিল (Gas)', icon: 'fa-burn' },
-    { key: 'electricityBill', altKey: 'electricity_bill', name: 'বিদ্যুৎ বিল (Electricity)', icon: 'fa-bolt' },
-    { key: 'garbageBill', altKey: 'garbage_bill', name: 'ময়লা বিল (Garbage)', icon: 'fa-trash-alt' }
-  ];
-
   function getUserBillsMonth() {
     const monthEl = document.getElementById('billsUserMonth');
-    if (monthEl && monthEl.value) {
+    if (monthEl && monthEl.dataset.userChanged === 'true' && monthEl.value) {
       return monthEl.value;
     }
     // Auto-detect latest saved bill month for this project
     if (curProj) {
       const bills = JSON.parse(localStorage.getItem('meal_bills')) || [];
-      const projBills = bills.filter(x => (x.projectId || x.project_id) === curProj.id)
+      const projBills = bills.filter(x => String(x.projectId || x.project_id) === String(curProj.id))
                              .sort((a, b) => (b.monthYear || b.month_year || '').localeCompare(a.monthYear || a.month_year || ''));
       if (projBills.length > 0) {
         const latestSavedMonth = projBills[0].monthYear || projBills[0].month_year;
@@ -736,6 +744,7 @@ function initUserApp() {
         }
       }
     }
+    if (monthEl && monthEl.value) return monthEl.value;
     const tzOffset = (new Date()).getTimezoneOffset() * 60000;
     const defaultMonth = (new Date(Date.now() - tzOffset)).toISOString().slice(0, 7);
     if (monthEl) monthEl.value = defaultMonth;
@@ -744,10 +753,10 @@ function initUserApp() {
 
   const userBillsMonthInp = document.getElementById('billsUserMonth');
   if (userBillsMonthInp) {
-    if (!userBillsMonthInp.value) {
-      userBillsMonthInp.value = getUserBillsMonth();
-    }
-    userBillsMonthInp.addEventListener('change', () => loadUserBills());
+    userBillsMonthInp.addEventListener('change', () => {
+      userBillsMonthInp.dataset.userChanged = 'true';
+      loadUserBills();
+    });
   }
 
   function loadUserBills() {
@@ -755,11 +764,11 @@ function initUserApp() {
     const curMonthStr = getUserBillsMonth();
     
     const enrolls = JSON.parse(localStorage.getItem('meal_enrollments')) || [];
-    const approvedMems = enrolls.filter(e => (e.projectId || e.project_id) === curProj.id && e.status === 'approved');
+    const approvedMems = enrolls.filter(e => String(e.projectId || e.project_id) === String(curProj.id) && e.status === 'approved');
     const memCount = Math.max(1, approvedMems.length);
 
     const bills = JSON.parse(localStorage.getItem('meal_bills')) || [];
-    const b = bills.find(x => (x.projectId || x.project_id) === curProj.id && (x.monthYear || x.month_year) === curMonthStr);
+    const b = bills.find(x => String(x.projectId || x.project_id) === String(curProj.id) && String(x.monthYear || x.month_year) === String(curMonthStr));
 
     let customBills = [];
     if (b) {
@@ -775,7 +784,7 @@ function initUserApp() {
     let tableHtml = '';
 
     userBillDefs.forEach(def => {
-      const val = b ? parseFloat(b[def.key] || b[def.altKey] || 0) : 0;
+      const val = getBillVal(b, def.key, def.altKey);
       grandTotal += val;
       const perHead = val / memCount;
       tableHtml += `<tr>
@@ -839,19 +848,19 @@ function initUserApp() {
     // ─── Render All Months Bills History Table ───
     const histBody = document.getElementById('userBillsHistoryBody');
     if (histBody) {
-      const projBills = bills.filter(x => (x.projectId || x.project_id) === curProj.id)
+      const projBills = bills.filter(x => String(x.projectId || x.project_id) === String(curProj.id))
                              .sort((a, b) => (b.monthYear || b.month_year || '').localeCompare(a.monthYear || a.month_year || ''));
       if (!projBills.length) {
         histBody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-3">এখনো কোনো মাসিক বিল সেভ করা হয়নি।</td></tr>';
       } else {
         histBody.innerHTML = projBills.map(bRow => {
-          const mTotal = (parseFloat(bRow.houseRent || bRow.house_rent || 0) +
-            parseFloat(bRow.cookSalary || bRow.cook_salary || 0) +
-            parseFloat(bRow.wifiBill || bRow.wifi_bill || 0) +
-            parseFloat(bRow.gasBill || bRow.gas_bill || 0) +
-            parseFloat(bRow.electricityBill || bRow.electricity_bill || 0) +
-            parseFloat(bRow.garbageBill || bRow.garbage_bill || 0) +
-            parseFloat(bRow.otherBills || bRow.other_bills || 0));
+          const mTotal = (getBillVal(bRow, 'houseRent', 'house_rent') +
+            getBillVal(bRow, 'cookSalary', 'cook_salary') +
+            getBillVal(bRow, 'wifiBill', 'wifi_bill') +
+            getBillVal(bRow, 'gasBill', 'gas_bill') +
+            getBillVal(bRow, 'electricityBill', 'electricity_bill') +
+            getBillVal(bRow, 'garbageBill', 'garbage_bill') +
+            getBillVal(bRow, 'otherBills', 'other_bills'));
           const mShare = mTotal / memCount;
           const rowMonth = bRow.monthYear || bRow.month_year;
           const isSelected = rowMonth === curMonthStr;
@@ -862,13 +871,13 @@ function initUserApp() {
                 <i class="far fa-calendar-alt"></i> ${rowMonth} ${isSelected ? '(চলতি)' : ''}
               </button>
             </td>
-            <td class="tc">${parseFloat(bRow.houseRent || bRow.house_rent || 0).toFixed(0)} ৳</td>
-            <td class="tc">${parseFloat(bRow.cookSalary || bRow.cook_salary || 0).toFixed(0)} ৳</td>
-            <td class="tc">${parseFloat(bRow.wifiBill || bRow.wifi_bill || 0).toFixed(0)} ৳</td>
-            <td class="tc">${parseFloat(bRow.gasBill || bRow.gas_bill || 0).toFixed(0)} ৳</td>
-            <td class="tc">${parseFloat(bRow.electricityBill || bRow.electricity_bill || 0).toFixed(0)} ৳</td>
-            <td class="tc">${parseFloat(bRow.garbageBill || bRow.garbage_bill || 0).toFixed(0)} ৳</td>
-            <td class="tc">${parseFloat(bRow.otherBills || bRow.other_bills || 0).toFixed(0)} ৳</td>
+            <td class="tc">${getBillVal(bRow, 'houseRent', 'house_rent').toFixed(0)} ৳</td>
+            <td class="tc">${getBillVal(bRow, 'cookSalary', 'cook_salary').toFixed(0)} ৳</td>
+            <td class="tc">${getBillVal(bRow, 'wifiBill', 'wifi_bill').toFixed(0)} ৳</td>
+            <td class="tc">${getBillVal(bRow, 'gasBill', 'gas_bill').toFixed(0)} ৳</td>
+            <td class="tc">${getBillVal(bRow, 'electricityBill', 'electricity_bill').toFixed(0)} ৳</td>
+            <td class="tc">${getBillVal(bRow, 'garbageBill', 'garbage_bill').toFixed(0)} ৳</td>
+            <td class="tc">${getBillVal(bRow, 'otherBills', 'other_bills').toFixed(0)} ৳</td>
             <td class="tc font-bold">${mTotal.toFixed(2)} ৳</td>
             <td class="tc font-bold text-gradient">${mShare.toFixed(2)} ৳</td>
           </tr>`;
@@ -879,6 +888,7 @@ function initUserApp() {
             const m = e.currentTarget.dataset.month;
             const mInp = document.getElementById('billsUserMonth');
             if (mInp) {
+              mInp.dataset.userChanged = 'true';
               mInp.value = m;
               loadUserBills();
             }
@@ -918,7 +928,7 @@ function initUserApp() {
     let pdfTableHtml = '';
 
     userBillDefs.forEach(def => {
-      const val = b ? parseFloat(b[def.key] || b[def.altKey] || 0) : 0;
+      const val = getBillVal(b, def.key, def.altKey);
       grandTotal += val;
       const perHead = val / memCount;
       pdfTableHtml += `<tr style="border-bottom:1px solid #e2e8f0;">
