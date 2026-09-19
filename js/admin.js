@@ -1043,7 +1043,7 @@ function initAdminApp() {
           const expenses = JSON.parse(localStorage.getItem('meal_expenses')) || [];
           const idx = expenses.findIndex(x => x.id === id);
           if (idx > -1) {
-            expenses[idx] = { ...expenses[idx], date, item, amount, category, note };
+            expenses[idx] = { ...expenses[idx], date, item, amount, category, note, updatedBy: cur.id, updatedByName: cur.name };
             localStorage.setItem('meal_expenses', JSON.stringify(expenses));
           }
           document.getElementById('editExpModal')?.classList.remove('active');
@@ -1054,6 +1054,8 @@ function initAdminApp() {
             await window.API.post('expenses.php', { action: 'update' }, {
               id,
               project_id: curProjId,
+              user_id: cur.id,
+              updated_by: cur.id,
               date,
               item,
               amount,
@@ -1120,13 +1122,26 @@ function initAdminApp() {
         if ((ex.userId || ex.user_id) === cur.id) {
           adderName = `<strong>${adderName}</strong> <span class="badge badge-blue" style="font-size:0.65rem;">You</span>`;
         }
+
+        let updaterName = ex.updatedByName;
+        if (!updaterName && (ex.updatedBy || ex.updated_by)) {
+          const u2 = users.find(x => x.id === (ex.updatedBy || ex.updated_by));
+          if (u2) updaterName = u2.name;
+        }
+        if ((ex.updatedBy || ex.updated_by) === cur.id) {
+          updaterName = `${updaterName || 'You'} <span class="badge badge-yellow" style="font-size:0.65rem;">You</span>`;
+        }
+
         const catIcon = ex.category === 'bazaar' ? '🛒' : '📦';
         body.innerHTML += `<tr>
           <td style="white-space:nowrap;"><i class="far fa-calendar-alt text-muted" style="margin-right:4px;"></i>${ex.date}</td>
           <td><strong>${ex.item}</strong></td>
           <td class="tc"><span class="badge badge-blue">${catIcon} ${ex.category === 'bazaar' ? 'বাজার' : 'অন্যান্য'}</span></td>
           <td class="tc font-bold text-gradient">${parseFloat(ex.amount).toFixed(2)} ৳</td>
-          <td>${adderName}</td>
+          <td>
+            <div style="font-weight:600; font-size:0.88rem;">${adderName}</div>
+            ${updaterName ? `<div style="font-size:0.75rem; color:#f59e0b; margin-top:3px;"><i class="fas fa-history" style="font-size:0.7rem;"></i> আপডেট: ${updaterName}</div>` : ''}
+          </td>
           <td style="font-size:.82rem; color:var(--text-muted);">${ex.note || '—'}</td>
           <td class="tc" style="white-space:nowrap;">
             <button class="btn btn-outline btn-sm btn-edit-exp" data-id="${ex.id}" title="সম্পাদনা করুন" style="padding:.25rem .5rem; font-size:.78rem; margin-right:4px;"><i class="fas fa-edit"></i></button>

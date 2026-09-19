@@ -12,10 +12,13 @@ if ($action === 'list') {
     if (!$pid) jsonResponse(['error' => 'project_id required'], 400);
 
     $sql = "SELECT me.id, me.project_id as projectId, me.user_id as userId, me.date,
-                   me.item, me.amount, me.category, me.note, me.created_at,
-                   u.name as userName
+                   me.item, me.amount, me.category, me.note, me.created_at, me.updated_at,
+                   me.updated_by as updatedBy,
+                   u.name as userName,
+                   u2.name as updatedByName
             FROM market_expenses me
             LEFT JOIN users u ON me.user_id = u.id
+            LEFT JOIN users u2 ON me.updated_by = u2.id
             WHERE me.project_id = ?";
     $params = [$pid];
 
@@ -61,13 +64,14 @@ if ($action === 'add') {
 // ── POST: Update/Edit an existing market expense entry
 if ($action === 'update' || $action === 'edit') {
     $data = getBody();
-    $id     = $data['id'] ?? '';
-    $pid    = $data['project_id'] ?? '';
-    $date   = $data['date'] ?? '';
-    $item   = trim($data['item'] ?? '');
-    $amount = floatval($data['amount'] ?? 0);
-    $cat    = $data['category'] ?? 'bazaar';
-    $note   = $data['note'] ?? '';
+    $id        = $data['id'] ?? '';
+    $pid       = $data['project_id'] ?? '';
+    $updatedBy = $data['updated_by'] ?? ($data['user_id'] ?? null);
+    $date      = $data['date'] ?? '';
+    $item      = trim($data['item'] ?? '');
+    $amount    = floatval($data['amount'] ?? 0);
+    $cat       = $data['category'] ?? 'bazaar';
+    $note      = $data['note'] ?? '';
 
     if (!$id || !$item || $amount <= 0 || !$date) {
         jsonResponse(['error' => 'id, date, item and amount are required'], 400);
@@ -75,14 +79,14 @@ if ($action === 'update' || $action === 'edit') {
 
     if ($pid) {
         $stmt = $db->prepare("UPDATE market_expenses
-                              SET date = ?, item = ?, amount = ?, category = ?, note = ?
+                              SET date = ?, item = ?, amount = ?, category = ?, note = ?, updated_by = ?, updated_at = NOW()
                               WHERE id = ? AND project_id = ?");
-        $stmt->execute([$date, $item, $amount, $cat, $note, $id, $pid]);
+        $stmt->execute([$date, $item, $amount, $cat, $note, $updatedBy, $id, $pid]);
     } else {
         $stmt = $db->prepare("UPDATE market_expenses
-                              SET date = ?, item = ?, amount = ?, category = ?, note = ?
+                              SET date = ?, item = ?, amount = ?, category = ?, note = ?, updated_by = ?, updated_at = NOW()
                               WHERE id = ?");
-        $stmt->execute([$date, $item, $amount, $cat, $note, $id]);
+        $stmt->execute([$date, $item, $amount, $cat, $note, $updatedBy, $id]);
     }
 
     jsonResponse(['success' => true, 'message' => 'Expense updated successfully']);

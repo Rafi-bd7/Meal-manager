@@ -172,15 +172,15 @@
     }
 
     const chats = JSON.parse(localStorage.getItem('meal_chats') || '[]');
-    const mine  = chats.filter(c => c.projectId === projId)
-                       .sort((a, b) => a.time - b.time);
+    const mine  = chats.filter(c => String(c.projectId || c.project_id) === String(projId))
+                       .sort((a, b) => Number(a.time) - Number(b.time));
 
     const atBottom = msgs.scrollHeight - msgs.clientHeight <= msgs.scrollTop + 30;
     msgs.innerHTML = mine.map(c => {
-      const self = c.userId === curUser.id;
-      const t = new Date(c.time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+      const self = String(c.userId || c.user_id) === String(curUser.id);
+      const t = new Date(Number(c.time)).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
       return `<div class="cm ${self ? 'me' : 'you'}">
-        ${!self ? `<div class="cm-name">${c.userName}</div>` : ''}
+        ${!self ? `<div class="cm-name">${c.userName || c.user_name || 'Member'}</div>` : ''}
         <div>${c.text}</div>
         <div class="cm-time">${t}</div>
       </div>`;
@@ -215,6 +215,7 @@
           text,
           time: msg.time
         });
+        await window.API.syncState();
       }
     } catch (e) {
       console.warn('Chat send error:', e);

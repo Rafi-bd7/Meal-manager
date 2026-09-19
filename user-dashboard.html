@@ -175,7 +175,7 @@
                 <th>পণ্য</th>
                 <th class="tc">ধরন</th>
                 <th class="tc">টাকা (৳)</th>
-                <th>যোগ করেছে</th>
+                <th>যোগ / আপডেট করেছে</th>
                 <th>নোট</th>
                 <th class="tc">অ্যাকশন</th>
               </tr>
@@ -224,7 +224,10 @@
       <div id="tab-notices" class="tab-content glass-panel">
         <div class="flex items-center justify-between flex-wrap gap-3 mb-3">
           <h3 style="font-size:1.05rem; margin:0;"><i class="fas fa-bullhorn" style="color:var(--primary);"></i> ম্যানেজারের নোটিশ বোর্ড</h3>
-          <button id="enableNotifyBtn" class="btn btn-outline btn-sm"><i class="fas fa-bell"></i> নোটিফিকেশন চালু করুন</button>
+          <div class="flex gap-2 items-center flex-wrap">
+            <button id="clearAllUserNoticesBtn" class="btn btn-outline btn-sm" style="color:#ef4444; border-color:rgba(239,68,68,0.4);"><i class="fas fa-trash-alt"></i> সব নোটিশ মুছুন</button>
+            <button id="enableNotifyBtn" class="btn btn-outline btn-sm"><i class="fas fa-bell"></i> নোটিফিকেশন চালু করুন</button>
+          </div>
         </div>
         <div id="userNoticesList" style="display:flex; flex-direction:column; gap:0.75rem;">
           <p class="text-muted text-center py-3">কোনো নোটিশ নেই।</p>

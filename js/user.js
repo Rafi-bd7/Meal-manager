@@ -482,7 +482,7 @@ function initUserApp() {
         const expenses = JSON.parse(localStorage.getItem('meal_expenses')) || [];
         const idx = expenses.findIndex(x => x.id === id);
         if (idx > -1) {
-          expenses[idx] = { ...expenses[idx], date, item, amount, category, note };
+          expenses[idx] = { ...expenses[idx], date, item, amount, category, note, updatedBy: cur.id, updatedByName: cur.name };
           localStorage.setItem('meal_expenses', JSON.stringify(expenses));
         }
         document.getElementById('editExpModal')?.classList.remove('active');
@@ -493,6 +493,8 @@ function initUserApp() {
           await window.API.post('expenses.php', { action: 'update' }, {
             id,
             project_id: curProj.id,
+            user_id: cur.id,
+            updated_by: cur.id,
             date,
             item,
             amount,
@@ -569,6 +571,15 @@ function initUserApp() {
         adderName = `<strong>${adderName}</strong> <span class="badge badge-blue" style="font-size:0.65rem;">You</span>`;
       }
 
+      let updaterName = exp.updatedByName;
+      if (!updaterName && (exp.updatedBy || exp.updated_by)) {
+        const u2 = users.find(x => x.id === (exp.updatedBy || exp.updated_by));
+        if (u2) updaterName = u2.name;
+      }
+      if ((exp.updatedBy || exp.updated_by) === cur.id) {
+        updaterName = `${updaterName || 'You'} <span class="badge badge-yellow" style="font-size:0.65rem;">You</span>`;
+      }
+
       const catBadge = exp.category === 'other'
         ? '<span class="badge badge-yellow" style="font-size:0.75rem;">📦 অন্যান্য</span>'
         : '<span class="badge badge-green" style="font-size:0.75rem;">🛒 বাজার</span>';
@@ -578,7 +589,10 @@ function initUserApp() {
         <td><strong>${exp.item}</strong></td>
         <td class="tc">${catBadge}</td>
         <td class="tc font-bold text-gradient">${parseFloat(exp.amount).toFixed(2)} ৳</td>
-        <td>${adderName}</td>
+        <td>
+          <div style="font-weight:600; font-size:0.88rem;">${adderName}</div>
+          ${updaterName ? `<div style="font-size:0.75rem; color:#f59e0b; margin-top:3px;"><i class="fas fa-history" style="font-size:0.7rem;"></i> আপডেট: ${updaterName}</div>` : ''}
+        </td>
         <td style="color:var(--text-muted); font-size:0.85rem;">${exp.note || '—'}</td>
         <td class="tc" style="white-space:nowrap;">
           <button class="btn btn-outline btn-sm btn-edit-exp" data-id="${exp.id}" title="সম্পাদনা করুন" style="padding:.25rem .5rem; font-size:.78rem; margin-right:4px;"><i class="fas fa-edit"></i></button>
@@ -730,12 +744,57 @@ function initUserApp() {
       return `<div class="card p-3" style="background:var(--card-bg); border-radius:0.75rem; border:1px solid var(--glass-border);">
         <div class="flex justify-between items-center mb-1">
           <span class="badge badge-blue"><i class="fas fa-bullhorn"></i> ম্যানেজারের নোটিশ</span>
-          <span class="text-muted" style="font-size:0.75rem;">${dStr}</span>
+          <div class="flex items-center gap-2">
+            <span class="text-muted" style="font-size:0.75rem;">${dStr}</span>
+            <button class="btn btn-danger btn-sm btn-del-user-notice" data-id="${n.id}" title="নোটিশটি মুছে ফেলুন" style="padding:2px 8px; font-size:0.72rem; line-height:1;"><i class="fas fa-times"></i></button>
+          </div>
         </div>
         <p style="margin:0; font-size:0.95rem; line-height:1.5;">${n.message}</p>
       </div>`;
     }).join('');
+
+    // Attach delete notice event listeners
+    list.querySelectorAll('.btn-del-user-notice').forEach(btn => {
+      btn.addEventListener('click', async e => {
+        const id = e.currentTarget.dataset.id;
+        try {
+          const allN = JSON.parse(localStorage.getItem('meal_notifications')) || [];
+          localStorage.setItem('meal_notifications', JSON.stringify(allN.filter(x => String(x.id) !== String(id))));
+          showToast('নোটিশ মুছে ফেলা হয়েছে।');
+          loadUserNotices();
+
+          if (window.API) {
+            await window.API.post('notifications.php', { action: 'delete' }, { id });
+            await window.API.syncState();
+            loadUserNotices();
+          }
+        } catch(err) {
+          showToast(err.message || 'Error deleting notice', 'error');
+        }
+      });
+    });
   }
+
+  // Clear all user notices button handler
+  document.getElementById('clearAllUserNoticesBtn')?.addEventListener('click', async () => {
+    if (!curProj) return;
+    if (!confirm('আপনি কি এই নোটিশ বোর্ডের সকল নোটিশ মুছে ফেলতে চান?')) return;
+    try {
+      const allN = JSON.parse(localStorage.getItem('meal_notifications')) || [];
+      const remaining = allN.filter(n => (n.projectId || n.project_id) !== curProj.id);
+      localStorage.setItem('meal_notifications', JSON.stringify(remaining));
+      showToast('সকল নোটিশ মুছে ফেলা হয়েছে।');
+      loadUserNotices();
+
+      if (window.API) {
+        await window.API.post('notifications.php', { action: 'clear_all' }, { project_id: curProj.id, user_id: cur.id });
+        await window.API.syncState();
+        loadUserNotices();
+      }
+    } catch(err) {
+      showToast(err.message || 'Error clearing notices', 'error');
+    }
+  });
 
   document.getElementById('enableNotifyBtn')?.addEventListener('click', async () => {
     if (!('Notification' in window)) return showToast('আপনার ব্রাউজারে নোটিফিকেশন সাপোর্ট নেই', 'error');

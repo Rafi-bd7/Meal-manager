@@ -32,11 +32,23 @@ $envPass = getenv('DB_PASS') ?: ($_ENV['DB_PASS'] ?? '');
 $envName = getenv('DB_NAME') ?: ($_ENV['DB_NAME'] ?? null);
 $envPort = getenv('DB_PORT') ?: ($_ENV['DB_PORT'] ?? '3306');
 
-$isLocal = in_array($_SERVER['SERVER_NAME'] ?? '', ['localhost', '127.0.0.1']) || 
-           in_array($_SERVER['HTTP_HOST'] ?? '', ['localhost', '127.0.0.1']) ||
-           (php_sapi_name() === 'cli-server');
-
 $serverHost = $_SERVER['HTTP_HOST'] ?? ($_SERVER['SERVER_NAME'] ?? '');
+
+// Check if running on Alwaysdata Linux server
+$isAlwaysdata = (strpos($serverHost, 'alwaysdata.net') !== false || file_exists('/home/mealmanager'));
+
+// Check if running in local environment (XAMPP / Windows / Localhost / LAN IP / Cloudflare tunnel to local)
+$isLocal = (!$isAlwaysdata) && (
+    in_array($serverHost, ['localhost', '127.0.0.1']) || 
+    in_array($_SERVER['SERVER_NAME'] ?? '', ['localhost', '127.0.0.1']) ||
+    (php_sapi_name() === 'cli' || php_sapi_name() === 'cli-server') ||
+    PHP_OS_FAMILY === 'Windows' ||
+    is_dir('C:\\xampp') ||
+    strpos($serverHost, 'trycloudflare.com') !== false ||
+    strpos($serverHost, 'loca.lt') !== false ||
+    strpos($serverHost, 'ngrok') !== false ||
+    preg_match('/^(192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)/', $serverHost)
+);
 
 if ($envHost) {
     // Cloud / Render Environment Variables
@@ -45,7 +57,7 @@ if ($envHost) {
     $user   = $envUser;
     $pass   = $envPass;
     $dbname = $envName;
-} elseif (strpos($serverHost, 'alwaysdata.net') !== false || file_exists('/home/mealmanager')) {
+} elseif ($isAlwaysdata) {
     // Alwaysdata Hosting
     $host   = 'mysql-mealmanager.alwaysdata.net';
     $port   = '3306';
@@ -53,18 +65,27 @@ if ($envHost) {
     $pass   = '@@mealmanager@@';
     $dbname = 'mealmanager_meals';
 } elseif ($isLocal) {
+    // Local XAMPP MySQL (always used when running on local machine)
     $host   = '127.0.0.1';
     $port   = '3306';
     $user   = 'root';
     $pass   = '';
     $dbname = 'meal_manager_db';
 } else {
-    // Fallback to Alwaysdata if hosted
-    $host   = 'mysql-mealmanager.alwaysdata.net';
-    $port   = '3306';
-    $user   = 'mealmanager';
-    $pass   = '@@mealmanager@@';
-    $dbname = 'mealmanager_meals';
+    // Default fallback: local XAMPP if Windows/XAMPP exists, otherwise Alwaysdata
+    if (PHP_OS_FAMILY === 'Windows' || is_dir('C:\\xampp')) {
+        $host   = '127.0.0.1';
+        $port   = '3306';
+        $user   = 'root';
+        $pass   = '';
+        $dbname = 'meal_manager_db';
+    } else {
+        $host   = 'mysql-mealmanager.alwaysdata.net';
+        $port   = '3306';
+        $user   = 'mealmanager';
+        $pass   = '@@mealmanager@@';
+        $dbname = 'mealmanager_meals';
+    }
 }
 // ──────────────────────────────────────────────────────────────────────
 
@@ -155,6 +176,12 @@ function initTables($pdo) {
         UNIQUE KEY `project_month` (`project_id`, `month_year`),
         INDEX (`project_id`)
     ) ENGINE=InnoDB");
+
+    // Auto-migrate: ensure market_expenses columns exist
+    try {
+        $pdo->exec("ALTER TABLE `market_expenses` ADD COLUMN IF NOT EXISTS `updated_by` VARCHAR(64) NULL");
+        $pdo->exec("ALTER TABLE `market_expenses` ADD COLUMN IF NOT EXISTS `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
+    } catch (Exception $e) {}
 
     // Auto-migrate comments reply columns
     try {

@@ -54,4 +54,21 @@ if ($action === 'delete') {
     jsonResponse(['success' => true, 'message' => 'Notification deleted.']);
 }
 
+if ($action === 'delete_all' || $action === 'clear_all') {
+    $data = getBody();
+    $projectId = $data['project_id'] ?? '';
+    $userId = $data['user_id'] ?? '';
+    if (!$projectId) jsonResponse(['error' => 'Project ID required.'], 400);
+
+    if ($userId) {
+        $stmt = $db->prepare("DELETE FROM notifications WHERE project_id = ? AND (to_user = ? OR to_user = 'all')");
+        $stmt->execute([$projectId, $userId]);
+    } else {
+        $stmt = $db->prepare("DELETE FROM notifications WHERE project_id = ?");
+        $stmt->execute([$projectId]);
+    }
+
+    jsonResponse(['success' => true, 'message' => 'All notifications deleted.']);
+}
+
 jsonResponse(['error' => 'Invalid action.'], 400);
