@@ -69,14 +69,21 @@ if ($action === 'update' || $action === 'edit') {
     $cat    = $data['category'] ?? 'bazaar';
     $note   = $data['note'] ?? '';
 
-    if (!$id || !$pid || !$item || $amount <= 0 || !$date) {
-        jsonResponse(['error' => 'id, project_id, date, item and amount are required'], 400);
+    if (!$id || !$item || $amount <= 0 || !$date) {
+        jsonResponse(['error' => 'id, date, item and amount are required'], 400);
     }
 
-    $stmt = $db->prepare("UPDATE market_expenses
-                          SET date = ?, item = ?, amount = ?, category = ?, note = ?
-                          WHERE id = ? AND project_id = ?");
-    $stmt->execute([$date, $item, $amount, $cat, $note, $id, $pid]);
+    if ($pid) {
+        $stmt = $db->prepare("UPDATE market_expenses
+                              SET date = ?, item = ?, amount = ?, category = ?, note = ?
+                              WHERE id = ? AND project_id = ?");
+        $stmt->execute([$date, $item, $amount, $cat, $note, $id, $pid]);
+    } else {
+        $stmt = $db->prepare("UPDATE market_expenses
+                              SET date = ?, item = ?, amount = ?, category = ?, note = ?
+                              WHERE id = ?");
+        $stmt->execute([$date, $item, $amount, $cat, $note, $id]);
+    }
 
     jsonResponse(['success' => true, 'message' => 'Expense updated successfully']);
 }
@@ -86,9 +93,13 @@ if ($action === 'delete') {
     $data = getBody();
     $id  = $data['id'] ?? '';
     $pid = $data['project_id'] ?? '';
-    if (!$id || !$pid) jsonResponse(['error' => 'id and project_id required'], 400);
+    if (!$id) jsonResponse(['error' => 'id required'], 400);
 
-    $db->prepare("DELETE FROM market_expenses WHERE id = ? AND project_id = ?")->execute([$id, $pid]);
+    if ($pid) {
+        $db->prepare("DELETE FROM market_expenses WHERE id = ? AND project_id = ?")->execute([$id, $pid]);
+    } else {
+        $db->prepare("DELETE FROM market_expenses WHERE id = ?")->execute([$id]);
+    }
     jsonResponse(['success' => true]);
 }
 
