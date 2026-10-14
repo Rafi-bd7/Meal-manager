@@ -139,7 +139,7 @@
           </div>
           <div class="flex items-center gap-2 flex-wrap" style="align-items:center;">
             <button id="userSheetPrevMonth" class="btn btn-outline btn-sm" title="আগের মাস" style="padding:0.45rem 0.85rem;"><i class="fas fa-chevron-left"></i></button>
-            <div id="userSheetMonthDisplay" style="font-weight:700; font-size:0.95rem; min-width:140px; text-align:center; padding:0.45rem 1rem; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.22); border-radius:8px; color:var(--text); box-shadow:0 2px 6px rgba(0,0,0,0.08); cursor:pointer;" title="মাস পরিবর্তন করতে ক্লিক করুন">মাস লোড হচ্ছে...</div>
+            <div id="userSheetMonthDisplay" style="font-weight:700; font-size:0.95rem; min-width:140px; text-align:center; padding:0.45rem 1rem; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.22); border-radius:8px; color:var(--text); box-shadow:0 2px 6px rgba(0,0,0,0.08); cursor:pointer;" title="মাস পরিবর্তন করতে ক্লিক করুন">অক্টোবর ২০২৬</div>
             <input type="month" id="userSheetMonth" style="position:absolute; opacity:0; width:1px; height:1px; pointer-events:none;">
             <button id="userSheetNextMonth" class="btn btn-outline btn-sm" title="পরের মাস" style="padding:0.45rem 0.85rem;"><i class="fas fa-chevron-right"></i></button>
             <button id="userPrintSheetBtn" class="btn btn-primary btn-sm" style="padding:0.45rem 0.9rem;"><i class="fas fa-print"></i> প্রিন্ট শিট</button>
@@ -515,11 +515,19 @@
   </div>
 
 
-  <script src="js/api.js"></script>
-  <script src="js/notifications.js"></script>
-  <script src="js/chat.js"></script>
-  <script src="js/user.js"></script>
+  <script src="js/api.js?v=20.2"></script>
+  <script src="js/notifications.js?v=20.2"></script>
+  <script src="js/chat.js?v=20.2"></script>
+  <script src="js/user.js?v=20.2"></script>
   <script>
+    // Immediate auto-load of meal sheet
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => {
+        if (typeof window.loadAllMealsSheet === 'function') {
+          window.loadAllMealsSheet();
+        }
+      }, 500);
+    });
     // PWA Service Worker
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js').catch(() => {});

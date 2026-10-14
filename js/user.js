@@ -1348,7 +1348,7 @@ function initUserApp() {
     updateMonthDisplayUser();
   }
 
-  window.loadAllMealsSheet = async function() {
+  async function loadAllMealsSheet() {
     initSheetControlsUser();
 
     // 1. Resolve current active project with multiple fallbacks
@@ -1363,6 +1363,10 @@ function initUserApp() {
         const projects = JSON.parse(localStorage.getItem('meal_projects') || '[]');
         curProj = projects.find(p => String(p.id) === pid) || { id: pid, name: "অক্টোবর ' ২৬" };
       }
+    }
+    if (!curProj) {
+      const projects = JSON.parse(localStorage.getItem('meal_projects') || '[]');
+      if (projects.length > 0) curProj = projects[projects.length - 1];
     }
     if (!curProj) return;
 
@@ -1422,7 +1426,8 @@ function initUserApp() {
       liveMembers,
       liveRecords
     );
-  };
+  }
+  window.loadAllMealsSheet = loadAllMealsSheet;
 
   function renderAllMealsSheetTable(projId, yearMonth, theadId, tbodyId, tfootId, kpiMemId, kpiMonthId, kpiTodayId, optMembers, optRecords) {
     const thead = document.getElementById(theadId);
