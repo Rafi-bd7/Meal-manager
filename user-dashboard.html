@@ -83,6 +83,7 @@
 
       <div class="tabs" style="flex-wrap:wrap;">
         <button class="tab-btn active" data-tab="meals"><i class="fas fa-calendar-check"></i> Daily Meals</button>
+        <button class="tab-btn" data-tab="allmeals"><i class="fas fa-table"></i> All Members Meals Tracker</button>
         <button class="tab-btn" data-tab="bazaar"><i class="fas fa-shopping-basket"></i> বাজার খরচ</button>
         <button class="tab-btn" data-tab="bills"><i class="fas fa-file-invoice"></i> মাসিক বিল</button>
         <button class="tab-btn" data-tab="menu"><i class="fas fa-list"></i> Weekly Menu</button>
@@ -123,6 +124,51 @@
             <i class="fas fa-save"></i> Save Meal Selection
           </button>
           <p class="text-muted mt-1" style="font-size:.8rem;">Selections are saved and instantly visible to admin.</p>
+        </div>
+      </div>
+
+      <!-- Tab: All Members Meals Tracker (Read Only Sheet) -->
+      <div id="tab-allmeals" class="tab-content glass-panel">
+        <div class="flex items-center justify-between flex-wrap gap-3 mb-3">
+          <div>
+            <h3 style="font-size:1.1rem; margin:0;"><i class="fas fa-table" style="color:var(--primary);"></i> সকল মেম্বারদের মিল ট্র্যাকার (All Members Meals Tracker)</h3>
+            <p class="text-muted" style="font-size:0.8rem; margin:3px 0 0;">
+              <span class="badge badge-purple" style="font-size:0.7rem;"><i class="fas fa-lock"></i> শুধুমাত্র দেখার জন্য (Read-Only)</span>
+              অ্যাডমিন যে যে মিল এন্ট্রি ও আপডেট করবেন, তাই এখানে স্বয়ংক্রিয়ভাবে প্রদর্শিত হবে।
+            </p>
+          </div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <button id="userSheetPrevMonth" class="btn btn-outline btn-sm" title="আগের মাস"><i class="fas fa-chevron-left"></i></button>
+            <input type="month" id="userSheetMonth" class="form-control" style="width:auto; padding:0.4rem 0.75rem; font-weight:600;">
+            <button id="userSheetNextMonth" class="btn btn-outline btn-sm" title="পরের মাস"><i class="fas fa-chevron-right"></i></button>
+            <button id="userPrintSheetBtn" class="btn btn-primary btn-sm"><i class="fas fa-print"></i> প্রিন্ট শিট</button>
+          </div>
+        </div>
+
+        <!-- Summary KPI badges -->
+        <div class="grid-3 mb-3" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
+          <div class="stat-card" style="padding:0.75rem 1rem;">
+            <div class="stat-label" style="font-size:0.75rem;"><i class="fas fa-users"></i> মেসের মোট মেম্বার</div>
+            <div class="stat-value" id="userSheetTotalMembers" style="font-size:1.3rem;">0 জন</div>
+          </div>
+          <div class="stat-card" style="padding:0.75rem 1rem;">
+            <div class="stat-label" style="font-size:0.75rem;"><i class="fas fa-utensils"></i> এই মাসের মেসের মোট মিল</div>
+            <div class="stat-value" id="userSheetMonthGrandMeals" style="font-size:1.3rem; color:var(--primary);">0</div>
+          </div>
+          <div class="stat-card" style="padding:0.75rem 1rem;">
+            <div class="stat-label" style="font-size:0.75rem;"><i class="fas fa-calendar-day"></i> আজকের মেসের মোট মিল</div>
+            <div class="stat-value" id="userSheetTodayGrandMeals" style="font-size:1.3rem; color:var(--accent);">0</div>
+          </div>
+        </div>
+
+        <div class="meal-sheet-container">
+          <div class="meal-sheet-scroll">
+            <table class="meal-sheet-table" id="userMealSheetTable">
+              <thead id="userMealSheetHead"></thead>
+              <tbody id="userMealSheetBody"></tbody>
+              <tfoot id="userMealSheetFoot"></tfoot>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -216,7 +262,7 @@
         <div class="flex items-center gap-3 mb-4 flex-wrap">
           <div id="myProfilePic" style="width:60px; height:60px; border-radius:50%; background:var(--primary); display:flex; align-items:center; justify-content:center; font-size:1.5rem; overflow:hidden;"></div>
           <div>
-            <input type="file" id="profilePicInput" accept="image/*" style="display:none;">
+            <input type="file" id="profilePicInput" accept="image/jpeg,image/png,image/webp,image/*" style="display:none;">
             <button id="uploadPicBtn" class="btn btn-outline btn-sm"><i class="fas fa-upload"></i> Upload Photo</button>
             <p class="text-muted" style="font-size:.75rem; margin-top:.25rem;">Max 100KB recommended</p>
           </div>

@@ -200,11 +200,13 @@ function runMigrations($pdo) {
         $pdo->exec("ALTER TABLE `comments` ADD COLUMN IF NOT EXISTS `reply_time` BIGINT NULL");
     } catch (Exception $e) {}
 
-    // Auto-migrate chats: reply & reactions columns
+    // Auto-migrate chats: reply & reactions columns & ensure longtext
     try {
         $pdo->exec("ALTER TABLE `chats` ADD COLUMN IF NOT EXISTS `reply_to` VARCHAR(64) NULL");
         $pdo->exec("ALTER TABLE `chats` ADD COLUMN IF NOT EXISTS `reply_text` TEXT NULL");
         $pdo->exec("ALTER TABLE `chats` ADD COLUMN IF NOT EXISTS `reactions` TEXT NULL");
+        $pdo->exec("ALTER TABLE `chats` MODIFY COLUMN `image` LONGTEXT NULL");
+        $pdo->exec("ALTER TABLE `users` MODIFY COLUMN `photo` LONGTEXT NULL");
     } catch (Exception $e) {}
 
     // Auto-create chat_presence table for typing/online status

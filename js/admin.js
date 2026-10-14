@@ -327,6 +327,7 @@ function initAdminApp() {
     if (typeof loadBazaar === 'function') loadBazaar();
     if (typeof loadBills === 'function') loadBills();
     if (typeof loadNotices === 'function') loadNotices();
+    if (typeof renderAdminMealSheet === 'function') renderAdminMealSheet();
   }
 
 
@@ -479,7 +480,93 @@ function initAdminApp() {
         showToast(err.message || 'Error deleting user', 'error');
       }
     }));
+
+    // Populate Manager Handover Select
+    const handoverSelect = document.getElementById('handoverNewAdminSelect');
+    const mgrDisplay = document.getElementById('currentManagerNameDisplay');
+    if (mgrDisplay) {
+      const projects = JSON.parse(localStorage.getItem('meal_projects')) || [];
+      const p = projects.find(x => (x.id || x.projectId) === curProjId);
+      const adminU = p ? users.find(x => x.id === (p.admin_id || p.adminId)) : cur;
+      mgrDisplay.textContent = adminU ? adminU.name : cur.name;
+    }
+    if (handoverSelect) {
+      handoverSelect.innerHTML = '<option value="">— মেম্বার বাছাই করুন —</option>';
+      const approvedMems = pEnrolls.filter(e => e.status === 'approved');
+      approvedMems.forEach(en => {
+        const uid = en.userId || en.user_id;
+        if (String(uid) === String(cur.id)) return; // Exclude self
+        const u = users.find(x => String(x.id) === String(uid));
+        if (u) {
+          handoverSelect.innerHTML += `<option value="${u.id}">${u.name} (${u.email})</option>`;
+        }
+      });
+    }
   }
+
+  // Handle Manager Handover Button
+  document.getElementById('confirmHandoverBtn')?.addEventListener('click', async () => {
+    const sel = document.getElementById('handoverNewAdminSelect');
+    const newAdminId = sel ? sel.value : '';
+    const demoteSelf = document.getElementById('handoverDemoteSelf')?.checked ?? true;
+
+    if (!newAdminId) {
+      showToast('দয়া করে নতুন ম্যানেজার নির্বাচন করুন', 'error');
+      return;
+    }
+    const users = JSON.parse(localStorage.getItem('meal_users')) || [];
+    const newAdminUser = users.find(x => String(x.id) === String(newAdminId));
+    const newAdminName = newAdminUser ? newAdminUser.name : 'নির্বাচিত সদস্য';
+
+    if (!confirm(`আপনি কি নিশ্চিত যে "${newAdminName}" কে এই মেসের নতুন ম্যানেজার করতে চান?`)) {
+      return;
+    }
+
+    try {
+      if (window.API) {
+        await window.API.post('projects.php', { action: 'handover_manager' }, {
+          project_id: curProjId,
+          current_admin_id: cur.id,
+          new_admin_id: newAdminId,
+          demote_self: demoteSelf
+        });
+      }
+
+      // Update local projects
+      const projects = JSON.parse(localStorage.getItem('meal_projects')) || [];
+      const pIdx = projects.findIndex(p => (p.id || p.projectId) === curProjId);
+      if (pIdx > -1) {
+        projects[pIdx].admin_id = newAdminId;
+        projects[pIdx].adminId = newAdminId;
+        localStorage.setItem('meal_projects', JSON.stringify(projects));
+      }
+
+      // Update users
+      const uIdx = users.findIndex(u => String(u.id) === String(newAdminId));
+      if (uIdx > -1) {
+        users[uIdx].role = 'admin';
+      }
+      if (demoteSelf) {
+        const myIdx = users.findIndex(u => String(u.id) === String(cur.id));
+        if (myIdx > -1) {
+          users[myIdx].role = 'user';
+        }
+        cur.role = 'user';
+        localStorage.setItem('currentUser', JSON.stringify(cur));
+      }
+      localStorage.setItem('meal_users', JSON.stringify(users));
+
+      if (demoteSelf) {
+        alert(`ম্যানেজার হস্তান্তর সফল হয়েছে! নতুন ম্যানেজার: ${newAdminName}\nআপনাকে মেম্বার ড্যাশবোর্ডে নিয়ে যাওয়া হচ্ছে...`);
+        window.location.href = 'user-dashboard.html';
+      } else {
+        showToast(`ম্যানেজার হস্তান্তর সফল হয়েছে! নতুন ম্যানেজার: ${newAdminName}`, 'success');
+        refresh();
+      }
+    } catch (err) {
+      showToast(err.message || 'ম্যানেজার পরিবর্তন করতে সমস্যা হয়েছে', 'error');
+    }
+  });
 
   // ─── Daily Tracker ───
   function loadTracker() {
@@ -959,20 +1046,26 @@ function initAdminApp() {
   document.getElementById('profilePicInput')?.addEventListener('change', e => {
     const file = e.target.files[0];
     if(!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => {
+
+    if (file.size > 15 * 1024 * 1024) {
+      showToast('ছবির সাইজ অনেক বড় (সর্বোচ্চ ১৫MB)।', 'warning');
+      return;
+    }
+
+    try {
+      const blobUrl = URL.createObjectURL(file);
       const img = new Image();
       img.onload = async () => {
-        const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 150;
-        const scaleSize = MAX_WIDTH / img.width;
-        canvas.width = MAX_WIDTH;
-        canvas.height = img.height * scaleSize;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-        
         try {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 180;
+          const scaleSize = MAX_WIDTH / img.width;
+          canvas.width = MAX_WIDTH;
+          canvas.height = Math.round(img.height * scaleSize);
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+          
           if (window.API) {
             await window.API.post('auth.php', { action: 'update_photo' }, { user_id: cur.id, photo: dataUrl });
           }
@@ -982,15 +1075,24 @@ function initAdminApp() {
             users[idx].photo = dataUrl;
             localStorage.setItem('meal_users', JSON.stringify(users));
           }
-          showToast('Profile picture updated!');
+          cur.photo = dataUrl;
+          localStorage.setItem('currentUser', JSON.stringify(cur));
+          showToast('প্রোফাইল ছবি সফলভাবে আপডেট হয়েছে!');
           loadProfiles();
         } catch (err) {
-          showToast(err.message || 'Error updating photo', 'error');
+          showToast(err.message || 'ছবি আপডেট করতে সমস্যা হয়েছে', 'error');
+        } finally {
+          URL.revokeObjectURL(blobUrl);
         }
       };
-      img.src = ev.target.result;
-    };
-    reader.readAsDataURL(file);
+      img.onerror = () => {
+        URL.revokeObjectURL(blobUrl);
+        showToast('ছবিটি পড়া যায়নি, দয়া করে অন্য ছবি নির্বাচন করুন।', 'error');
+      };
+      img.src = blobUrl;
+    } catch (err) {
+      showToast('ছবি প্রসেস করতে ব্যর্থ হয়েছে', 'error');
+    }
   });
 
   function loadProfiles() {
@@ -1935,6 +2037,164 @@ function initAdminApp() {
       await window.MealNotifications.requestPermission();
     }
   });
+
+  // ═════════════════════════════════════════════════════════════════════════════
+  // All Members Meals Sheet (Monthly Matrix View for Admin)
+  // ═════════════════════════════════════════════════════════════════════════════
+  let _sheetMonthAdmin = new Date().toISOString().slice(0, 7);
+
+  function initSheetControlsAdmin() {
+    const monthInp = document.getElementById('adminSheetMonth');
+    if (monthInp && !monthInp._bound) {
+      monthInp._bound = true;
+      monthInp.value = _sheetMonthAdmin;
+      monthInp.addEventListener('change', () => {
+        if (monthInp.value) {
+          _sheetMonthAdmin = monthInp.value;
+          renderAdminMealSheet();
+        }
+      });
+      document.getElementById('adminSheetPrevMonth')?.addEventListener('click', () => {
+        const parts = _sheetMonthAdmin.split('-');
+        let y = parseInt(parts[0], 10), m = parseInt(parts[1], 10) - 1;
+        if (m < 1) { m = 12; y--; }
+        _sheetMonthAdmin = `${y}-${String(m).padStart(2, '0')}`;
+        monthInp.value = _sheetMonthAdmin;
+        renderAdminMealSheet();
+      });
+      document.getElementById('adminSheetNextMonth')?.addEventListener('click', () => {
+        const parts = _sheetMonthAdmin.split('-');
+        let y = parseInt(parts[0], 10), m = parseInt(parts[1], 10) + 1;
+        if (m > 12) { m = 1; y++; }
+        _sheetMonthAdmin = `${y}-${String(m).padStart(2, '0')}`;
+        monthInp.value = _sheetMonthAdmin;
+        renderAdminMealSheet();
+      });
+      document.getElementById('adminPrintSheetBtn')?.addEventListener('click', () => {
+        window.print();
+      });
+    }
+  }
+
+  window.renderAdminMealSheet = function() {
+    if (!curProjId) return;
+    initSheetControlsAdmin();
+
+    const thead = document.getElementById('adminMealSheetHead');
+    const tbody = document.getElementById('adminMealSheetBody');
+    const tfoot = document.getElementById('adminMealSheetFoot');
+    if (!thead || !tbody || !tfoot) return;
+
+    const [yearStr, monthStr] = _sheetMonthAdmin.split('-');
+    const year = parseInt(yearStr, 10);
+    const month = parseInt(monthStr, 10);
+    const daysInMonth = new Date(year, month, 0).getDate();
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const weekdaysBn = ['রবি', 'সোম', 'মঙ্গল', 'বুধ', 'বৃহঃ', 'শুক্র', 'শনি'];
+
+    const enrolls = JSON.parse(localStorage.getItem('meal_enrollments') || '[]');
+    const users = JSON.parse(localStorage.getItem('meal_users') || '[]');
+    const records = JSON.parse(localStorage.getItem('meal_records') || '[]');
+
+    const approvedEnrolls = enrolls.filter(e => (e.projectId || e.project_id) === curProjId && e.status === 'approved');
+    const members = approvedEnrolls.map(e => {
+      const uid = e.userId || e.user_id;
+      const u = users.find(x => String(x.id) === String(uid)) || { id: uid, name: 'Member (' + String(uid).slice(0,4) + ')', photo: null };
+      return { id: uid, name: u.name, photo: u.photo };
+    }).sort((a, b) => a.name.localeCompare(b.name));
+
+    const kpiMem = document.getElementById('adminSheetTotalMembers');
+    if (kpiMem) kpiMem.textContent = members.length + ' জন';
+
+    // 1. Build Header Row
+    let headHtml = `<tr><th class="sticky-col">সদস্য (Member)</th>`;
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dStr = `${yearStr}-${monthStr}-${String(d).padStart(2, '0')}`;
+      const dayDate = new Date(year, month - 1, d);
+      const dayName = weekdaysBn[dayDate.getDay()];
+      const isToday = (dStr === todayStr);
+      headHtml += `<th class="${isToday ? 'today-col' : ''}">${d}<br><span style="font-size:0.65rem; font-weight:normal; opacity:0.8;">${dayName}</span></th>`;
+    }
+    headHtml += `<th class="sticky-total">মোট মিল</th></tr>`;
+    thead.innerHTML = headHtml;
+
+    // 2. Build Member Rows
+    const dailyTotals = new Array(daysInMonth + 1).fill(0);
+    let monthGrandTotal = 0;
+    let todayGrandTotal = 0;
+
+    let bodyHtml = '';
+    if (members.length === 0) {
+      bodyHtml = `<tr><td colspan="${daysInMonth + 2}" class="tc text-muted" style="padding:2rem;">এই প্রজেক্টে এখনো কোনো অনুমোদিত সদস্য নেই।</td></tr>`;
+    } else {
+      members.forEach(m => {
+        let memberTotal = 0;
+        const initial = (m.name || 'M').charAt(0).toUpperCase();
+        const avatarHtml = m.photo
+          ? `<img src="${m.photo}" style="width:24px; height:24px; border-radius:50%; object-fit:cover; border:1px solid var(--glass-border);">`
+          : `<div style="width:24px; height:24px; border-radius:50%; background:var(--primary); color:#fff; display:inline-flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:700;">${initial}</div>`;
+
+        let rowHtml = `<tr>`;
+        rowHtml += `<td class="sticky-col">
+          <div style="display:flex; align-items:center; gap:8px;">
+            ${avatarHtml}
+            <span style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:120px;" title="${m.name}">${m.name}</span>
+          </div>
+        </td>`;
+
+        for (let d = 1; d <= daysInMonth; d++) {
+          const dStr = `${yearStr}-${monthStr}-${String(d).padStart(2, '0')}`;
+          const isToday = (dStr === todayStr);
+          const r = records.find(x => (x.projectId || x.project_id) === curProjId && (x.userId || x.user_id) === m.id && x.date === dStr);
+          
+          let count = 0;
+          let details = [];
+          if (r) {
+            if (r.breakfast) { count += 0.5; details.push('সকাল (0.5)'); }
+            if (r.lunch) { count += 1.0; details.push('দুপুর (1.0)'); }
+            if (r.dinner) { count += 1.0; details.push('রাত (1.0)'); }
+          }
+
+          memberTotal += count;
+          dailyTotals[d] += count;
+          if (isToday) todayGrandTotal += count;
+
+          const tooltip = details.length > 0 ? `${m.name} (${dStr}): ${details.join(', ')} = ${count} মিল` : `${m.name}: কোনো মিল নেই`;
+          const chipClass = count >= 2.5 ? 'full' : count >= 1.0 ? 'med' : count > 0 ? 'half' : 'zero';
+          const displayVal = count > 0 ? count : '-';
+
+          rowHtml += `<td class="${isToday ? 'today-col' : ''}">
+            <span class="meal-sheet-chip ${chipClass}" title="${tooltip}">${displayVal}</span>
+          </td>`;
+        }
+
+        monthGrandTotal += memberTotal;
+        rowHtml += `<td class="sticky-total tc">
+          <span class="badge badge-blue" style="font-size:0.82rem; font-weight:800; padding:3px 8px;">${memberTotal}</span>
+        </td></tr>`;
+
+        bodyHtml += rowHtml;
+      });
+    }
+    tbody.innerHTML = bodyHtml;
+
+    // 3. Build Footer Row
+    let footHtml = `<tr class="footer-row"><td class="sticky-col" style="font-weight:800;">দৈনিক মেসের মোট</td>`;
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dStr = `${yearStr}-${monthStr}-${String(d).padStart(2, '0')}`;
+      const isToday = (dStr === todayStr);
+      const dayTot = dailyTotals[d];
+      footHtml += `<td class="${isToday ? 'today-col' : ''}" style="font-weight:700;">${dayTot > 0 ? dayTot : '-'}</td>`;
+    }
+    footHtml += `<td class="sticky-total tc" style="font-size:0.95rem; color:var(--primary); font-weight:800;">${monthGrandTotal}</td></tr>`;
+    tfoot.innerHTML = footHtml;
+
+    const kpiMonth = document.getElementById('adminSheetMonthGrandMeals');
+    if (kpiMonth) kpiMonth.textContent = monthGrandTotal;
+    const kpiToday = document.getElementById('adminSheetTodayGrandMeals');
+    if (kpiToday) kpiToday.textContent = todayGrandTotal;
+  };
 }
 
 // Start app — prevent double init

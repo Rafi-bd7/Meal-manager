@@ -133,6 +133,8 @@ function initUserApp() {
       if (typeof loadBazaar === 'function') loadBazaar();
     } else if (btn.dataset.tab === 'meals') {
       loadMeals();
+    } else if (btn.dataset.tab === 'allmeals') {
+      loadAllMealsSheet();
     } else if (btn.dataset.tab === 'menu') {
       loadMenu();
     } else if (btn.dataset.tab === 'notices') {
@@ -793,20 +795,26 @@ function initUserApp() {
   document.getElementById('profilePicInput')?.addEventListener('change', e => {
     const file = e.target.files[0];
     if(!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => {
+
+    if (file.size > 15 * 1024 * 1024) {
+      showToast('ছবির সাইজ অনেক বড় (সর্বোচ্চ ১৫MB)।', 'warning');
+      return;
+    }
+
+    try {
+      const blobUrl = URL.createObjectURL(file);
       const img = new Image();
       img.onload = async () => {
-        const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 150;
-        const scaleSize = MAX_WIDTH / img.width;
-        canvas.width = MAX_WIDTH;
-        canvas.height = img.height * scaleSize;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-        
         try {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 180;
+          const scaleSize = MAX_WIDTH / img.width;
+          canvas.width = MAX_WIDTH;
+          canvas.height = Math.round(img.height * scaleSize);
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+          
           if (window.API) {
             await window.API.post('auth.php', { action: 'update_photo' }, { user_id: cur.id, photo: dataUrl });
           }
@@ -816,15 +824,24 @@ function initUserApp() {
             users[idx].photo = dataUrl;
             localStorage.setItem('meal_users', JSON.stringify(users));
           }
-          showToast('Profile picture updated!');
+          cur.photo = dataUrl;
+          localStorage.setItem('currentUser', JSON.stringify(cur));
+          showToast('প্রোফাইল ছবি সফলভাবে আপডেট হয়েছে!');
           loadProfiles();
         } catch (err) {
-          showToast(err.message || 'Error updating photo', 'error');
+          showToast(err.message || 'ছবি আপডেট করতে সমস্যা হয়েছে', 'error');
+        } finally {
+          URL.revokeObjectURL(blobUrl);
         }
       };
-      img.src = ev.target.result;
-    };
-    reader.readAsDataURL(file);
+      img.onerror = () => {
+        URL.revokeObjectURL(blobUrl);
+        showToast('ছবিটি পড়া যায়নি, দয়া করে অন্য ছবি নির্বাচন করুন।', 'error');
+      };
+      img.src = blobUrl;
+    } catch (err) {
+      showToast('ছবি প্রসেস করতে ব্যর্থ হয়েছে', 'error');
+    }
   });
 
   function loadProfiles() {
@@ -1246,6 +1263,191 @@ function initUserApp() {
       }
     }
   });
+
+  // ═════════════════════════════════════════════════════════════════════════════
+  // All Members Meals Tracker (Read-Only Monthly Sheet for Members)
+  // ═════════════════════════════════════════════════════════════════════════════
+  let _sheetMonthUser = new Date().toISOString().slice(0, 7);
+
+  function initSheetControlsUser() {
+    const monthInp = document.getElementById('userSheetMonth');
+    if (monthInp && !monthInp._bound) {
+      monthInp._bound = true;
+      monthInp.value = _sheetMonthUser;
+      monthInp.addEventListener('change', () => {
+        if (monthInp.value) {
+          _sheetMonthUser = monthInp.value;
+          loadAllMealsSheet();
+        }
+      });
+      document.getElementById('userSheetPrevMonth')?.addEventListener('click', () => {
+        const parts = _sheetMonthUser.split('-');
+        let y = parseInt(parts[0], 10), m = parseInt(parts[1], 10) - 1;
+        if (m < 1) { m = 12; y--; }
+        _sheetMonthUser = `${y}-${String(m).padStart(2, '0')}`;
+        monthInp.value = _sheetMonthUser;
+        loadAllMealsSheet();
+      });
+      document.getElementById('userSheetNextMonth')?.addEventListener('click', () => {
+        const parts = _sheetMonthUser.split('-');
+        let y = parseInt(parts[0], 10), m = parseInt(parts[1], 10) + 1;
+        if (m > 12) { m = 1; y++; }
+        _sheetMonthUser = `${y}-${String(m).padStart(2, '0')}`;
+        monthInp.value = _sheetMonthUser;
+        loadAllMealsSheet();
+      });
+      document.getElementById('userPrintSheetBtn')?.addEventListener('click', () => {
+        window.print();
+      });
+    }
+  }
+
+  window.loadAllMealsSheet = async function() {
+    if (!curProj) return;
+    initSheetControlsUser();
+
+    // Fetch fresh meals from API if possible
+    if (window.API) {
+      try {
+        const res = await window.API.get('meals.php', { action: 'list', project_id: curProj.id });
+        if (res && Array.isArray(res.records)) {
+          const localR = JSON.parse(localStorage.getItem('meal_records') || '[]');
+          const otherProjR = localR.filter(x => (x.projectId || x.project_id) !== curProj.id);
+          localStorage.setItem('meal_records', JSON.stringify([...otherProjR, ...res.records]));
+        }
+      } catch (e) {}
+    }
+
+    renderAllMealsSheetTable(
+      curProj.id,
+      _sheetMonthUser,
+      'userMealSheetHead',
+      'userMealSheetBody',
+      'userMealSheetFoot',
+      'userSheetTotalMembers',
+      'userSheetMonthGrandMeals',
+      'userSheetTodayGrandMeals'
+    );
+  };
+
+  function renderAllMealsSheetTable(projId, yearMonth, theadId, tbodyId, tfootId, kpiMemId, kpiMonthId, kpiTodayId) {
+    const thead = document.getElementById(theadId);
+    const tbody = document.getElementById(tbodyId);
+    const tfoot = document.getElementById(tfootId);
+    if (!thead || !tbody || !tfoot) return;
+
+    const [yearStr, monthStr] = yearMonth.split('-');
+    const year = parseInt(yearStr, 10);
+    const month = parseInt(monthStr, 10);
+    const daysInMonth = new Date(year, month, 0).getDate();
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const weekdaysBn = ['রবি', 'সোম', 'মঙ্গল', 'বুধ', 'বৃহঃ', 'শুক্র', 'শনি'];
+
+    const enrolls = JSON.parse(localStorage.getItem('meal_enrollments') || '[]');
+    const users = JSON.parse(localStorage.getItem('meal_users') || '[]');
+    const records = JSON.parse(localStorage.getItem('meal_records') || '[]');
+
+    const approvedEnrolls = enrolls.filter(e => (e.projectId || e.project_id) === projId && e.status === 'approved');
+    const members = approvedEnrolls.map(e => {
+      const uid = e.userId || e.user_id;
+      const u = users.find(x => String(x.id) === String(uid)) || { id: uid, name: 'Member (' + String(uid).slice(0,4) + ')', photo: null };
+      return { id: uid, name: u.name, photo: u.photo };
+    }).sort((a, b) => a.name.localeCompare(b.name));
+
+    // Update member count KPI
+    const kpiMem = document.getElementById(kpiMemId);
+    if (kpiMem) kpiMem.textContent = members.length + ' জন';
+
+    // 1. Build Header Row
+    let headHtml = `<tr><th class="sticky-col">সদস্য (Member)</th>`;
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dStr = `${yearStr}-${monthStr}-${String(d).padStart(2, '0')}`;
+      const dayDate = new Date(year, month - 1, d);
+      const dayName = weekdaysBn[dayDate.getDay()];
+      const isToday = (dStr === todayStr);
+      headHtml += `<th class="${isToday ? 'today-col' : ''}">${d}<br><span style="font-size:0.65rem; font-weight:normal; opacity:0.8;">${dayName}</span></th>`;
+    }
+    headHtml += `<th class="sticky-total">মোট মিল</th></tr>`;
+    thead.innerHTML = headHtml;
+
+    // 2. Build Member Rows & Accumulate totals
+    const dailyTotals = new Array(daysInMonth + 1).fill(0);
+    let monthGrandTotal = 0;
+    let todayGrandTotal = 0;
+
+    let bodyHtml = '';
+    if (members.length === 0) {
+      bodyHtml = `<tr><td colspan="${daysInMonth + 2}" class="tc text-muted" style="padding:2rem;">এই প্রজেক্টে এখনো কোনো অনুমোদিত সদস্য নেই।</td></tr>`;
+    } else {
+      members.forEach(m => {
+        let memberTotal = 0;
+        const initial = (m.name || 'M').charAt(0).toUpperCase();
+        const avatarHtml = m.photo
+          ? `<img src="${m.photo}" style="width:24px; height:24px; border-radius:50%; object-fit:cover; border:1px solid var(--glass-border);">`
+          : `<div style="width:24px; height:24px; border-radius:50%; background:var(--primary); color:#fff; display:inline-flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:700;">${initial}</div>`;
+
+        let rowHtml = `<tr>`;
+        rowHtml += `<td class="sticky-col">
+          <div style="display:flex; align-items:center; gap:8px;">
+            ${avatarHtml}
+            <span style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:120px;" title="${m.name}">${m.name}</span>
+          </div>
+        </td>`;
+
+        for (let d = 1; d <= daysInMonth; d++) {
+          const dStr = `${yearStr}-${monthStr}-${String(d).padStart(2, '0')}`;
+          const isToday = (dStr === todayStr);
+          const r = records.find(x => (x.projectId || x.project_id) === projId && (x.userId || x.user_id) === m.id && x.date === dStr);
+          
+          let count = 0;
+          let details = [];
+          if (r) {
+            if (r.breakfast) { count += 0.5; details.push('সকাল (0.5)'); }
+            if (r.lunch) { count += 1.0; details.push('দুপুর (1.0)'); }
+            if (r.dinner) { count += 1.0; details.push('রাত (1.0)'); }
+          }
+
+          memberTotal += count;
+          dailyTotals[d] += count;
+          if (isToday) todayGrandTotal += count;
+
+          const tooltip = details.length > 0 ? `${m.name} (${dStr}): ${details.join(', ')} = ${count} মিল` : `${m.name}: কোনো মিল নেই`;
+          const chipClass = count >= 2.5 ? 'full' : count >= 1.0 ? 'med' : count > 0 ? 'half' : 'zero';
+          const displayVal = count > 0 ? count : '-';
+
+          rowHtml += `<td class="${isToday ? 'today-col' : ''}">
+            <span class="meal-sheet-chip ${chipClass}" title="${tooltip}">${displayVal}</span>
+          </td>`;
+        }
+
+        monthGrandTotal += memberTotal;
+        rowHtml += `<td class="sticky-total tc">
+          <span class="badge badge-blue" style="font-size:0.82rem; font-weight:800; padding:3px 8px;">${memberTotal}</span>
+        </td></tr>`;
+
+        bodyHtml += rowHtml;
+      });
+    }
+    tbody.innerHTML = bodyHtml;
+
+    // 3. Build Footer Row (Daily Totals)
+    let footHtml = `<tr class="footer-row"><td class="sticky-col" style="font-weight:800;">দৈনিক মেসের মোট</td>`;
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dStr = `${yearStr}-${monthStr}-${String(d).padStart(2, '0')}`;
+      const isToday = (dStr === todayStr);
+      const dayTot = dailyTotals[d];
+      footHtml += `<td class="${isToday ? 'today-col' : ''}" style="font-weight:700;">${dayTot > 0 ? dayTot : '-'}</td>`;
+    }
+    footHtml += `<td class="sticky-total tc" style="font-size:0.95rem; color:var(--primary); font-weight:800;">${monthGrandTotal}</td></tr>`;
+    tfoot.innerHTML = footHtml;
+
+    // Update KPI summaries
+    const kpiMonth = document.getElementById(kpiMonthId);
+    if (kpiMonth) kpiMonth.textContent = monthGrandTotal;
+    const kpiToday = document.getElementById(kpiTodayId);
+    if (kpiToday) kpiToday.textContent = todayGrandTotal;
+  }
 }
 
 // Start app

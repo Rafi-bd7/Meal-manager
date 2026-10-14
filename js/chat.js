@@ -667,32 +667,70 @@
 
   // ── Image Attachment ─────────────────────────────────────────────────────────
   attachBtn.addEventListener('click', () => fileInput.click());
+  fileInput.setAttribute('accept', 'image/jpeg,image/png,image/webp,image/*');
   fileInput.addEventListener('change', e => {
     const file = e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = ev => {
+
+    if (file.size > 15 * 1024 * 1024) {
+      if (window.showToast) window.showToast('ছবির সাইজ অনেক বড় (সর্বোচ্চ ১৫MB পর্যন্ত সমর্থিত)।', 'warning');
+      fileInput.value = '';
+      return;
+    }
+
+    try {
+      const blobUrl = URL.createObjectURL(file);
       const img = new Image();
+
       img.onload = () => {
-        const maxDim = 900;
-        let w = img.width, h = img.height;
-        if (w > maxDim || h > maxDim) {
-          if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
-          else { w = Math.round(w * maxDim / h); h = maxDim; }
+        try {
+          const maxDim = 800;
+          let w = img.width, h = img.height;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+            else { w = Math.round(w * maxDim / h); h = maxDim; }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, w, h);
+          pendingImageBase64 = canvas.toDataURL('image/jpeg', 0.72);
+          imgThumb.src = pendingImageBase64;
+          imgTray.style.display = 'flex';
+          const sizeKb = Math.round(pendingImageBase64.length * 0.75 / 1024);
+          document.getElementById('chatImgSizeText').textContent = `${w}×${h}px (~${sizeKb}KB)`;
+          updateSendIcon();
+          inp.focus();
+        } finally {
+          URL.revokeObjectURL(blobUrl);
         }
-        const canvas = document.createElement('canvas');
-        canvas.width = w; canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        pendingImageBase64 = canvas.toDataURL('image/jpeg', 0.78);
-        imgThumb.src = pendingImageBase64;
-        imgTray.style.display = 'flex';
-        document.getElementById('chatImgSizeText').textContent = `${w}×${h}px`;
-        updateSendIcon();
-        inp.focus();
       };
-      img.src = ev.target.result;
-    };
-    reader.readAsDataURL(file);
+
+      img.onerror = () => {
+        URL.revokeObjectURL(blobUrl);
+        // Fallback to FileReader if blob fails
+        const reader = new FileReader();
+        reader.onload = ev => {
+          const fallbackImg = new Image();
+          fallbackImg.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 400; canvas.height = 300;
+            canvas.getContext('2d').drawImage(fallbackImg, 0, 0, 400, 300);
+            pendingImageBase64 = canvas.toDataURL('image/jpeg', 0.7);
+            imgThumb.src = pendingImageBase64;
+            imgTray.style.display = 'flex';
+            updateSendIcon();
+          };
+          fallbackImg.src = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+      };
+
+      img.src = blobUrl;
+    } catch (err) {
+      console.warn('Image process error:', err);
+      if (window.showToast) window.showToast('ছবি প্রসেস করতে সমস্যা হয়েছে, অন্য ছবি নির্বাচন করুন।', 'error');
+    }
   });
   cancelImgBtn.addEventListener('click', () => {
     pendingImageBase64 = null;

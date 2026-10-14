@@ -163,7 +163,7 @@
         data: { url: options.url || './' }
       };
 
-      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      if ('serviceWorker' in navigator) {
         navigator.serviceWorker.ready.then(reg => {
           reg.showNotification(title, notifOptions);
         }).catch(() => {
@@ -179,7 +179,13 @@
   async function requestNotificationPermissionWithFeedback() {
     unlockAudio();
     if (!('Notification' in window)) {
-      if (window.showToast) window.showToast('আপনার ব্রাউজারে নোটিফিকেশন সাপোর্ট নেই', 'warning');
+      const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || 
+                    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      if (isIOS) {
+        if (window.showToast) window.showToast('আইফোনে নোটিফিকেশন পেতে সাফারি ব্রাউজার থেকে "Add to Home Screen" করুন', 'warning');
+      } else {
+        if (window.showToast) window.showToast('আপনার ব্রাউজারে নোটিফিকেশন সাপোর্ট নেই', 'warning');
+      }
       return false;
     }
 
@@ -206,6 +212,30 @@
   function renderNotifBanner() {
     const container = document.getElementById('notifBannerContainer');
     if (!container) return;
+
+    const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || 
+                  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const isStandalone = window.navigator.standalone === true || 
+                         window.matchMedia('(display-mode: standalone)').matches;
+
+    // Special guidance banner for iPhone users not yet running as PWA
+    if (isIOS && !isStandalone) {
+      container.innerHTML = `
+        <div id="_iosPwaHelperBanner" class="ios-pwa-banner">
+          <div class="ios-pwa-icon">🍎</div>
+          <div style="flex:1;">
+            <div style="font-weight:700; font-size:0.95rem;">iPhone এ নোটিফিকেশন পেতে:</div>
+            <div style="font-size:0.82rem; opacity:0.95; margin-top:3px; line-height:1.4;">
+              ১. নিচে সাফারি ব্রাউজারের <strong>Share আইকন</strong> <i class="fas fa-share-square"></i> চাপুন।<br>
+              ২. মেন্যু থেকে <strong>"Add to Home Screen"</strong> (হোম স্ক্রিনে যোগ করুন) সিলেক্ট করুন।<br>
+              ৩. এরপর হোমস্ক্রিনের অ্যাপটি ওপেন করে নোটিফিকেশন অন করুন।
+            </div>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
     const perm = ('Notification' in window) ? Notification.permission : 'denied';
     if (perm === 'granted') {
       container.innerHTML = '';

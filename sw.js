@@ -126,6 +126,23 @@ async function syncPendingData() {
   clients.forEach(client => client.postMessage({ type: 'SYNC_NOW' }));
 }
 
+// ── Client Messages (Trigger notifications via SW) ────────────────────────
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'SHOW_NOTIFICATION') {
+    const data = event.data.payload || {};
+    self.registration.showNotification(data.title || 'MealManager', {
+      body: data.body || '',
+      icon: data.icon || 'icons/icon-192.png',
+      badge: 'icons/icon-192.png',
+      vibrate: data.vibrate || [300, 100, 300, 100, 300],
+      sound: data.sound || 'sounds/notification.wav',
+      renotify: true,
+      tag: data.tag || ('meal-notice-' + Date.now()),
+      data: { url: data.url || './' }
+    });
+  }
+});
+
 // ── Push Notifications ────────────────────────────────────────────────────
 self.addEventListener('push', event => {
   const data = event.data ? event.data.json() : { title: 'MealManager', body: 'You have a new notification!' };
