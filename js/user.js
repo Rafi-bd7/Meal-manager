@@ -1359,87 +1359,96 @@ function initUserApp() {
     const kpiMem = document.getElementById(kpiMemId);
     if (kpiMem) kpiMem.textContent = members.length + ' জন';
 
-    // 1. Build Header Row
-    let headHtml = `<tr><th class="sticky-col">সদস্য (Member)</th>`;
+    if (members.length === 0) {
+      thead.innerHTML = `<tr><th>তারিখ / দিন</th><th class="sticky-total">মোট মিল</th></tr>`;
+      tbody.innerHTML = `<tr><td colspan="2" class="tc text-muted" style="padding:2rem;">এই প্রজেক্টে এখনো কোনো অনুমোদিত সদস্য নেই।</td></tr>`;
+      tfoot.innerHTML = '';
+      return;
+    }
+
+    // 1. Build Header Row (Top: Member Names!)
+    let headHtml = `<tr><th class="sticky-col" style="min-width:100px;">তারিখ / দিন</th>`;
+    members.forEach(m => {
+      const initial = (m.name || 'M').charAt(0).toUpperCase();
+      const avatarHtml = m.photo
+        ? `<img src="${m.photo}" style="width:26px; height:26px; border-radius:50%; object-fit:cover; border:1px solid var(--glass-border);">`
+        : `<div style="width:26px; height:26px; border-radius:50%; background:var(--primary); color:#fff; display:inline-flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700;">${initial}</div>`;
+      
+      headHtml += `<th class="tc" style="min-width:105px; padding:10px 8px;">
+        <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
+          ${avatarHtml}
+          <span style="font-weight:700; font-size:0.85rem; max-width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${m.name}">${m.name}</span>
+        </div>
+      </th>`;
+    });
+    headHtml += `<th class="sticky-total tc" style="min-width:90px;">দৈনিক মোট</th></tr>`;
+    thead.innerHTML = headHtml;
+
+    // 2. Build Body Rows (Side: Dates 1 to 31!)
+    const memberTotals = new Array(members.length).fill(0);
+    let monthGrandTotal = 0;
+    let todayGrandTotal = 0;
+
+    let bodyHtml = '';
     for (let d = 1; d <= daysInMonth; d++) {
       const dStr = `${yearStr}-${monthStr}-${String(d).padStart(2, '0')}`;
       const dayDate = new Date(year, month - 1, d);
       const dayName = weekdaysBn[dayDate.getDay()];
       const isToday = (dStr === todayStr);
-      headHtml += `<th class="${isToday ? 'today-col' : ''}">${d}<br><span style="font-size:0.65rem; font-weight:normal; opacity:0.8;">${dayName}</span></th>`;
-    }
-    headHtml += `<th class="sticky-total">মোট মিল</th></tr>`;
-    thead.innerHTML = headHtml;
 
-    // 2. Build Member Rows & Accumulate totals
-    const dailyTotals = new Array(daysInMonth + 1).fill(0);
-    let monthGrandTotal = 0;
-    let todayGrandTotal = 0;
+      let dailyTotal = 0;
+      let rowHtml = `<tr class="${isToday ? 'today-row' : ''}">`;
+      
+      // Date Column (Sticky Left)
+      const dateLabel = isToday 
+        ? `<span class="badge badge-blue" style="font-size:0.75rem; padding:2px 8px; font-weight:700;"><i class="fas fa-calendar-day"></i> ${d} (${dayName})</span>` 
+        : `<strong>${d}</strong> <span style="font-size:0.75rem; opacity:0.8;">(${dayName})</span>`;
+      rowHtml += `<td class="sticky-col tc">${dateLabel}</td>`;
 
-    let bodyHtml = '';
-    if (members.length === 0) {
-      bodyHtml = `<tr><td colspan="${daysInMonth + 2}" class="tc text-muted" style="padding:2rem;">এই প্রজেক্টে এখনো কোনো অনুমোদিত সদস্য নেই।</td></tr>`;
-    } else {
-      members.forEach(m => {
-        let memberTotal = 0;
-        const initial = (m.name || 'M').charAt(0).toUpperCase();
-        const avatarHtml = m.photo
-          ? `<img src="${m.photo}" style="width:24px; height:24px; border-radius:50%; object-fit:cover; border:1px solid var(--glass-border);">`
-          : `<div style="width:24px; height:24px; border-radius:50%; background:var(--primary); color:#fff; display:inline-flex; align-items:center; justify-content:center; font-size:0.7rem; font-weight:700;">${initial}</div>`;
-
-        let rowHtml = `<tr>`;
-        rowHtml += `<td class="sticky-col">
-          <div style="display:flex; align-items:center; gap:8px;">
-            ${avatarHtml}
-            <span style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:120px;" title="${m.name}">${m.name}</span>
-          </div>
-        </td>`;
-
-        for (let d = 1; d <= daysInMonth; d++) {
-          const dStr = `${yearStr}-${monthStr}-${String(d).padStart(2, '0')}`;
-          const isToday = (dStr === todayStr);
-          const r = records.find(x => (x.projectId || x.project_id) === projId && (x.userId || x.user_id) === m.id && x.date === dStr);
-          
-          let count = 0;
-          let details = [];
-          if (r) {
-            if (r.breakfast) { count += 0.5; details.push('সকাল (0.5)'); }
-            if (r.lunch) { count += 1.0; details.push('দুপুর (1.0)'); }
-            if (r.dinner) { count += 1.0; details.push('রাত (1.0)'); }
-          }
-
-          memberTotal += count;
-          dailyTotals[d] += count;
-          if (isToday) todayGrandTotal += count;
-
-          const tooltip = details.length > 0 ? `${m.name} (${dStr}): ${details.join(', ')} = ${count} মিল` : `${m.name}: কোনো মিল নেই`;
-          const chipClass = count >= 2.5 ? 'full' : count >= 1.0 ? 'med' : count > 0 ? 'half' : 'zero';
-          const displayVal = count > 0 ? count : '-';
-
-          rowHtml += `<td class="${isToday ? 'today-col' : ''}">
-            <span class="meal-sheet-chip ${chipClass}" title="${tooltip}">${displayVal}</span>
-          </td>`;
+      // Each Member's Meal Cell for day d
+      members.forEach((m, mIdx) => {
+        const r = records.find(x => (x.projectId || x.project_id) === projId && (x.userId || x.user_id) === m.id && x.date === dStr);
+        let count = 0;
+        let details = [];
+        if (r) {
+          if (r.breakfast) { count += 0.5; details.push('সকাল (0.5)'); }
+          if (r.lunch) { count += 1.0; details.push('দুপুর (1.0)'); }
+          if (r.dinner) { count += 1.0; details.push('রাত (1.0)'); }
         }
 
-        monthGrandTotal += memberTotal;
-        rowHtml += `<td class="sticky-total tc">
-          <span class="badge badge-blue" style="font-size:0.82rem; font-weight:800; padding:3px 8px;">${memberTotal}</span>
-        </td></tr>`;
+        memberTotals[mIdx] += count;
+        dailyTotal += count;
 
-        bodyHtml += rowHtml;
+        const tooltip = details.length > 0 ? `${m.name} (${dStr}): ${details.join(', ')} = ${count} মিল` : `${m.name}: কোনো মিল নেই`;
+        const chipClass = count >= 2.5 ? 'full' : count >= 1.0 ? 'med' : count > 0 ? 'half' : 'zero';
+        const displayVal = count > 0 ? count : '-';
+
+        rowHtml += `<td class="tc">
+          <span class="meal-sheet-chip ${chipClass}" title="${tooltip}">${displayVal}</span>
+        </td>`;
       });
+
+      monthGrandTotal += dailyTotal;
+      if (isToday) todayGrandTotal = dailyTotal;
+
+      // Daily Total Column (Sticky Right)
+      rowHtml += `<td class="sticky-total tc">
+        <strong style="font-size:0.88rem; color:${dailyTotal > 0 ? 'var(--text)' : 'var(--text-muted)'};">${dailyTotal > 0 ? dailyTotal : '-'}</strong>
+      </td></tr>`;
+
+      bodyHtml += rowHtml;
     }
     tbody.innerHTML = bodyHtml;
 
-    // 3. Build Footer Row (Daily Totals)
-    let footHtml = `<tr class="footer-row"><td class="sticky-col" style="font-weight:800;">দৈনিক মেসের মোট</td>`;
-    for (let d = 1; d <= daysInMonth; d++) {
-      const dStr = `${yearStr}-${monthStr}-${String(d).padStart(2, '0')}`;
-      const isToday = (dStr === todayStr);
-      const dayTot = dailyTotals[d];
-      footHtml += `<td class="${isToday ? 'today-col' : ''}" style="font-weight:700;">${dayTot > 0 ? dayTot : '-'}</td>`;
-    }
-    footHtml += `<td class="sticky-total tc" style="font-size:0.95rem; color:var(--primary); font-weight:800;">${monthGrandTotal}</td></tr>`;
+    // 3. Build Footer Row (Member Monthly Totals)
+    let footHtml = `<tr class="footer-row"><td class="sticky-col tc" style="font-weight:800; font-size:0.85rem;">সদস্যদের মোট</td>`;
+    members.forEach((m, mIdx) => {
+      const tot = memberTotals[mIdx];
+      footHtml += `<td class="tc">
+        <span class="badge badge-blue" style="font-size:0.85rem; font-weight:800; padding:4px 10px;">${tot}</span>
+      </td>`;
+    });
+    footHtml += `<td class="sticky-total tc" style="font-size:1.05rem; color:var(--primary); font-weight:900;">${monthGrandTotal}</td></tr>`;
     tfoot.innerHTML = footHtml;
 
     // Update KPI summaries

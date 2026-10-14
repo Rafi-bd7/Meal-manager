@@ -966,12 +966,12 @@ a { text-decoration:none; color:inherit; }
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  font-size: 0.82rem;
-  min-width: 900px;
+  font-size: 0.84rem;
+  min-width: 600px;
 }
 .meal-sheet-table th,
 .meal-sheet-table td {
-  padding: 8px 6px;
+  padding: 8px 10px;
   text-align: center;
   border-bottom: 1px solid var(--glass-border);
   border-right: 1px solid var(--glass-border);
@@ -991,10 +991,10 @@ a { text-decoration:none; color:inherit; }
   left: 0;
   z-index: 15;
   background: var(--card-bg);
-  text-align: left;
-  min-width: 140px;
-  max-width: 180px;
-  padding-left: 12px;
+  text-align: center;
+  min-width: 95px;
+  max-width: 120px;
+  padding: 8px 10px;
   border-right: 2px solid var(--primary);
   font-weight: 600;
 }
@@ -1009,7 +1009,7 @@ a { text-decoration:none; color:inherit; }
   z-index: 15;
   background: var(--card-bg);
   border-left: 2px solid var(--primary);
-  min-width: 75px;
+  min-width: 85px;
   font-weight: 700;
 }
 .meal-sheet-table th.sticky-total {
@@ -1053,13 +1053,14 @@ a { text-decoration:none; color:inherit; }
   color: var(--text-muted);
   opacity: 0.35;
 }
-.meal-sheet-table th.today-col,
-.meal-sheet-table td.today-col {
+.meal-sheet-table tr.today-row td {
   background: rgba(79, 142, 247, 0.08);
 }
-.meal-sheet-table th.today-col {
-  border-top: 2px solid var(--accent);
+.meal-sheet-table tr.today-row td.sticky-col {
+  background: rgba(79, 142, 247, 0.22);
+  border-left: 3px solid var(--accent);
   color: var(--accent);
+  font-weight: 700;
 }
 
 /* ─── iOS PWA Banner ─── */
