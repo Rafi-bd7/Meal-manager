@@ -2043,14 +2043,53 @@ function initAdminApp() {
   // ═════════════════════════════════════════════════════════════════════════════
   let _sheetMonthAdmin = new Date().toISOString().slice(0, 7);
 
+  const monthNamesBn = [
+    'জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
+    'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'
+  ];
+
+  function formatYearMonthBn(yearMonth) {
+    if (!yearMonth) return '';
+    const parts = yearMonth.split('-');
+    const y = parts[0];
+    const m = parseInt(parts[1], 10);
+    const mName = monthNamesBn[m - 1] || parts[1];
+    return `${mName} ${y}`;
+  }
+
+  function updateMonthDisplayAdmin() {
+    const disp = document.getElementById('adminSheetMonthDisplay');
+    const monthInp = document.getElementById('adminSheetMonth');
+    const txt = formatYearMonthBn(_sheetMonthAdmin);
+    if (disp) disp.textContent = txt;
+    if (monthInp) monthInp.value = _sheetMonthAdmin;
+  }
+
   function initSheetControlsAdmin() {
     const monthInp = document.getElementById('adminSheetMonth');
+    const disp = document.getElementById('adminSheetMonthDisplay');
+
+    if (disp && !disp._bound) {
+      disp._bound = true;
+      disp.addEventListener('click', () => {
+        if (monthInp) {
+          if (typeof monthInp.showPicker === 'function') {
+            try { monthInp.showPicker(); } catch(e) { monthInp.focus(); }
+          } else {
+            monthInp.focus();
+            monthInp.click();
+          }
+        }
+      });
+    }
+
     if (monthInp && !monthInp._bound) {
       monthInp._bound = true;
       monthInp.value = _sheetMonthAdmin;
       monthInp.addEventListener('change', () => {
         if (monthInp.value) {
           _sheetMonthAdmin = monthInp.value;
+          updateMonthDisplayAdmin();
           renderAdminMealSheet();
         }
       });
@@ -2059,7 +2098,7 @@ function initAdminApp() {
         let y = parseInt(parts[0], 10), m = parseInt(parts[1], 10) - 1;
         if (m < 1) { m = 12; y--; }
         _sheetMonthAdmin = `${y}-${String(m).padStart(2, '0')}`;
-        monthInp.value = _sheetMonthAdmin;
+        updateMonthDisplayAdmin();
         renderAdminMealSheet();
       });
       document.getElementById('adminSheetNextMonth')?.addEventListener('click', () => {
@@ -2067,16 +2106,17 @@ function initAdminApp() {
         let y = parseInt(parts[0], 10), m = parseInt(parts[1], 10) + 1;
         if (m > 12) { m = 1; y++; }
         _sheetMonthAdmin = `${y}-${String(m).padStart(2, '0')}`;
-        monthInp.value = _sheetMonthAdmin;
+        updateMonthDisplayAdmin();
         renderAdminMealSheet();
       });
       document.getElementById('adminPrintSheetBtn')?.addEventListener('click', () => {
         window.print();
       });
     }
+    updateMonthDisplayAdmin();
   }
 
-  window.renderAdminMealSheet = function() {
+  window.renderAdminMealSheet = async function() {
     if (!curProjId) return;
     initSheetControlsAdmin();
 
@@ -2085,7 +2125,9 @@ function initAdminApp() {
     const tfoot = document.getElementById('adminMealSheetFoot');
     if (!thead || !tbody || !tfoot) return;
 
-    const [yearStr, monthStr] = _sheetMonthAdmin.split('-');
+    const parts = (_sheetMonthAdmin || '').split('-');
+    const yearStr = parts[0] || new Date().getFullYear().toString();
+    const monthStr = parts[1] || String(new Date().getMonth() + 1).padStart(2, '0');
     const year = parseInt(yearStr, 10);
     const month = parseInt(monthStr, 10);
     const daysInMonth = new Date(year, month, 0).getDate();
@@ -2097,10 +2139,10 @@ function initAdminApp() {
     const users = JSON.parse(localStorage.getItem('meal_users') || '[]');
     const records = JSON.parse(localStorage.getItem('meal_records') || '[]');
 
-    const approvedEnrolls = enrolls.filter(e => (e.projectId || e.project_id) === curProjId && e.status === 'approved');
+    const approvedEnrolls = enrolls.filter(e => String(e.projectId || e.project_id) === String(curProjId) && String(e.status) === 'approved');
     const members = approvedEnrolls.map(e => {
-      const uid = e.userId || e.user_id;
-      const u = users.find(x => String(x.id) === String(uid)) || { id: uid, name: 'Member (' + String(uid).slice(0,4) + ')', photo: null };
+      const uid = String(e.userId || e.user_id);
+      const u = users.find(x => String(x.id) === uid) || { id: uid, name: 'সদস্য (' + uid.slice(0,4) + ')', photo: null };
       return { id: uid, name: u.name, photo: u.photo };
     }).sort((a, b) => a.name.localeCompare(b.name));
 
@@ -2111,6 +2153,10 @@ function initAdminApp() {
       thead.innerHTML = `<tr><th>তারিখ / দিন</th><th class="sticky-total">মোট মিল</th></tr>`;
       tbody.innerHTML = `<tr><td colspan="2" class="tc text-muted" style="padding:2rem;">এই প্রজেক্টে এখনো কোনো অনুমোদিত সদস্য নেই।</td></tr>`;
       tfoot.innerHTML = '';
+      const kpiMonth = document.getElementById('adminSheetMonthGrandMeals');
+      if (kpiMonth) kpiMonth.textContent = '0';
+      const kpiToday = document.getElementById('adminSheetTodayGrandMeals');
+      if (kpiToday) kpiToday.textContent = '0';
       return;
     }
 
@@ -2155,7 +2201,7 @@ function initAdminApp() {
 
       // Each Member's Meal Cell for day d
       members.forEach((m, mIdx) => {
-        const r = records.find(x => (x.projectId || x.project_id) === curProjId && (x.userId || x.user_id) === m.id && x.date === dStr);
+        const r = records.find(x => String(x.projectId || x.project_id) === String(curProjId) && String(x.userId || x.user_id) === String(m.id) && x.date === dStr);
         let count = 0;
         let details = [];
         if (r) {

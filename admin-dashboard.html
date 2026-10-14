@@ -141,11 +141,12 @@
               সম্পূর্ণ মাসের সকল সদস্যের দৈনিক মিলের পূর্ণাঙ্গ শিট। এক নজরে কার কোন দিনে কত মিল ছিল তা দেখতে পারবেন।
             </p>
           </div>
-          <div class="flex items-center gap-2 flex-wrap">
-            <button id="adminSheetPrevMonth" class="btn btn-outline btn-sm" title="আগের মাস"><i class="fas fa-chevron-left"></i></button>
-            <input type="month" id="adminSheetMonth" class="form-control" style="width:auto; padding:0.4rem 0.75rem; font-weight:600;">
-            <button id="adminSheetNextMonth" class="btn btn-outline btn-sm" title="পরের মাস"><i class="fas fa-chevron-right"></i></button>
-            <button id="adminPrintSheetBtn" class="btn btn-primary btn-sm"><i class="fas fa-print"></i> প্রিন্ট শিট</button>
+          <div class="flex items-center gap-2 flex-wrap" style="align-items:center;">
+            <button id="adminSheetPrevMonth" class="btn btn-outline btn-sm" title="আগের মাস" style="padding:0.45rem 0.85rem;"><i class="fas fa-chevron-left"></i></button>
+            <div id="adminSheetMonthDisplay" style="font-weight:700; font-size:0.95rem; min-width:140px; text-align:center; padding:0.45rem 1rem; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.22); border-radius:8px; color:var(--text); box-shadow:0 2px 6px rgba(0,0,0,0.08); cursor:pointer;" title="মাস পরিবর্তন করতে ক্লিক করুন">মাস লোড হচ্ছে...</div>
+            <input type="month" id="adminSheetMonth" style="position:absolute; opacity:0; width:1px; height:1px; pointer-events:none;">
+            <button id="adminSheetNextMonth" class="btn btn-outline btn-sm" title="পরের মাস" style="padding:0.45rem 0.85rem;"><i class="fas fa-chevron-right"></i></button>
+            <button id="adminPrintSheetBtn" class="btn btn-primary btn-sm" style="padding:0.45rem 0.9rem;"><i class="fas fa-print"></i> প্রিন্ট শিট</button>
           </div>
         </div>
 

@@ -94,6 +94,7 @@ function initUserApp() {
     initUser();
     loadUserBills();
     if (typeof loadBazaar === 'function') loadBazaar();
+    if (typeof loadAllMealsSheet === 'function') loadAllMealsSheet();
     checkNewNotices();
   }
 
@@ -151,14 +152,18 @@ function initUserApp() {
     const enrolls = JSON.parse(localStorage.getItem('meal_enrollments')) || [];
     const projects = JSON.parse(localStorage.getItem('meal_projects')) || [];
     
-    const myEnrolls = enrolls.filter(e => (e.userId || e.user_id) === cur.id);
-    const approvedEnrolls = myEnrolls.filter(e => e.status === 'approved');
+    const myEnrolls = enrolls.filter(e => String(e.userId || e.user_id) === String(cur.id));
+    const approvedEnrolls = myEnrolls.filter(e => String(e.status) === 'approved');
 
     if (approvedEnrolls.length > 0) {
       // Pick last selected or most recent approved project
       const savedPid = localStorage.getItem('meal_userLastProj');
-      enroll = approvedEnrolls.find(e => (e.projectId || e.project_id) === savedPid) || approvedEnrolls[approvedEnrolls.length - 1];
-      curProj = projects.find(p => p.id === (enroll.projectId || enroll.project_id));
+      enroll = approvedEnrolls.find(e => String(e.projectId || e.project_id) === String(savedPid)) || approvedEnrolls[approvedEnrolls.length - 1];
+      const targetPid = String(enroll.projectId || enroll.project_id);
+      curProj = projects.find(p => String(p.id) === targetPid);
+      if (!curProj) {
+        curProj = { id: targetPid, name: enroll.projectName || enroll.project_name || "অক্টোবর ' ২৬" };
+      }
       
       document.getElementById('joinSection').classList.add('hidden');
       document.getElementById('userWorkspace').classList.remove('hidden');
@@ -172,6 +177,7 @@ function initUserApp() {
         loadUserNotices();
         loadUserBills();
         if (typeof loadBazaar === 'function') loadBazaar();
+        if (typeof loadAllMealsSheet === 'function') loadAllMealsSheet();
         window.dispatchEvent(new Event('refreshChat'));
       }
     } else if (myEnrolls.length > 0) {
@@ -1269,14 +1275,53 @@ function initUserApp() {
   // ═════════════════════════════════════════════════════════════════════════════
   let _sheetMonthUser = new Date().toISOString().slice(0, 7);
 
+  const monthNamesBn = [
+    'জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
+    'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'
+  ];
+
+  function formatYearMonthBn(yearMonth) {
+    if (!yearMonth) return '';
+    const parts = yearMonth.split('-');
+    const y = parts[0];
+    const m = parseInt(parts[1], 10);
+    const mName = monthNamesBn[m - 1] || parts[1];
+    return `${mName} ${y}`;
+  }
+
+  function updateMonthDisplayUser() {
+    const disp = document.getElementById('userSheetMonthDisplay');
+    const monthInp = document.getElementById('userSheetMonth');
+    const txt = formatYearMonthBn(_sheetMonthUser);
+    if (disp) disp.textContent = txt;
+    if (monthInp) monthInp.value = _sheetMonthUser;
+  }
+
   function initSheetControlsUser() {
     const monthInp = document.getElementById('userSheetMonth');
+    const disp = document.getElementById('userSheetMonthDisplay');
+
+    if (disp && !disp._bound) {
+      disp._bound = true;
+      disp.addEventListener('click', () => {
+        if (monthInp) {
+          if (typeof monthInp.showPicker === 'function') {
+            try { monthInp.showPicker(); } catch(e) { monthInp.focus(); }
+          } else {
+            monthInp.focus();
+            monthInp.click();
+          }
+        }
+      });
+    }
+
     if (monthInp && !monthInp._bound) {
       monthInp._bound = true;
       monthInp.value = _sheetMonthUser;
       monthInp.addEventListener('change', () => {
         if (monthInp.value) {
           _sheetMonthUser = monthInp.value;
+          updateMonthDisplayUser();
           loadAllMealsSheet();
         }
       });
@@ -1285,7 +1330,7 @@ function initUserApp() {
         let y = parseInt(parts[0], 10), m = parseInt(parts[1], 10) - 1;
         if (m < 1) { m = 12; y--; }
         _sheetMonthUser = `${y}-${String(m).padStart(2, '0')}`;
-        monthInp.value = _sheetMonthUser;
+        updateMonthDisplayUser();
         loadAllMealsSheet();
       });
       document.getElementById('userSheetNextMonth')?.addEventListener('click', () => {
@@ -1293,50 +1338,101 @@ function initUserApp() {
         let y = parseInt(parts[0], 10), m = parseInt(parts[1], 10) + 1;
         if (m > 12) { m = 1; y++; }
         _sheetMonthUser = `${y}-${String(m).padStart(2, '0')}`;
-        monthInp.value = _sheetMonthUser;
+        updateMonthDisplayUser();
         loadAllMealsSheet();
       });
       document.getElementById('userPrintSheetBtn')?.addEventListener('click', () => {
         window.print();
       });
     }
+    updateMonthDisplayUser();
   }
 
   window.loadAllMealsSheet = async function() {
-    if (!curProj) return;
     initSheetControlsUser();
 
-    // Fetch fresh meals from API if possible
-    if (window.API) {
+    // 1. Resolve current active project with multiple fallbacks
+    if (!curProj) {
+      initUser();
+    }
+    if (!curProj) {
+      const enrolls = JSON.parse(localStorage.getItem('meal_enrollments') || '[]');
+      const myApproved = enrolls.find(e => String(e.userId || e.user_id) === String(cur.id) && String(e.status) === 'approved');
+      if (myApproved) {
+        const pid = String(myApproved.projectId || myApproved.project_id);
+        const projects = JSON.parse(localStorage.getItem('meal_projects') || '[]');
+        curProj = projects.find(p => String(p.id) === pid) || { id: pid, name: "অক্টোবর ' ২৬" };
+      }
+    }
+    if (!curProj) return;
+
+    const projId = String(curProj.id);
+    let liveMembers = null;
+    let liveRecords = null;
+
+    // 2. Fetch fresh live member enrollments & meal records directly from server
+    if (window.API && projId) {
       try {
-        const res = await window.API.get('meals.php', { action: 'list', project_id: curProj.id });
-        if (res && Array.isArray(res.records)) {
-          const localR = JSON.parse(localStorage.getItem('meal_records') || '[]');
-          const otherProjR = localR.filter(x => (x.projectId || x.project_id) !== curProj.id);
-          localStorage.setItem('meal_records', JSON.stringify([...otherProjR, ...res.records]));
+        const [enrollRes, mealsRes] = await Promise.all([
+          window.API.get('enrollments.php', { action: 'list', project_id: projId }).catch(() => null),
+          window.API.get('meals.php', { action: 'list', project_id: projId }).catch(() => null)
+        ]);
+
+        if (enrollRes && Array.isArray(enrollRes.enrollments)) {
+          const approved = enrollRes.enrollments.filter(e => String(e.status) === 'approved');
+          liveMembers = approved.map(e => ({
+            id: String(e.user_id || e.userId),
+            name: e.name || 'সদস্য',
+            photo: e.photo || null
+          })).sort((a, b) => a.name.localeCompare(b.name));
+
+          // Sync into localStorage
+          const localEnrolls = JSON.parse(localStorage.getItem('meal_enrollments') || '[]');
+          const otherEnrolls = localEnrolls.filter(e => String(e.projectId || e.project_id) !== projId);
+          const normalized = approved.map(e => ({
+            id: e.id,
+            projectId: String(e.project_id || e.projectId),
+            userId: String(e.user_id || e.userId),
+            status: e.status,
+            moneyGiven: parseFloat(e.money_given || e.moneyGiven || 0)
+          }));
+          localStorage.setItem('meal_enrollments', JSON.stringify([...otherEnrolls, ...normalized]));
         }
-      } catch (e) {}
+
+        if (mealsRes && Array.isArray(mealsRes.records)) {
+          liveRecords = mealsRes.records;
+          const localR = JSON.parse(localStorage.getItem('meal_records') || '[]');
+          const otherProjR = localR.filter(x => String(x.projectId || x.project_id) !== projId);
+          localStorage.setItem('meal_records', JSON.stringify([...otherProjR, ...mealsRes.records]));
+        }
+      } catch (e) {
+        console.warn('Live fetch for meal sheet:', e);
+      }
     }
 
     renderAllMealsSheetTable(
-      curProj.id,
+      projId,
       _sheetMonthUser,
       'userMealSheetHead',
       'userMealSheetBody',
       'userMealSheetFoot',
       'userSheetTotalMembers',
       'userSheetMonthGrandMeals',
-      'userSheetTodayGrandMeals'
+      'userSheetTodayGrandMeals',
+      liveMembers,
+      liveRecords
     );
   };
 
-  function renderAllMealsSheetTable(projId, yearMonth, theadId, tbodyId, tfootId, kpiMemId, kpiMonthId, kpiTodayId) {
+  function renderAllMealsSheetTable(projId, yearMonth, theadId, tbodyId, tfootId, kpiMemId, kpiMonthId, kpiTodayId, optMembers, optRecords) {
     const thead = document.getElementById(theadId);
     const tbody = document.getElementById(tbodyId);
     const tfoot = document.getElementById(tfootId);
     if (!thead || !tbody || !tfoot) return;
 
-    const [yearStr, monthStr] = yearMonth.split('-');
+    const parts = (yearMonth || '').split('-');
+    const yearStr = parts[0] || new Date().getFullYear().toString();
+    const monthStr = parts[1] || String(new Date().getMonth() + 1).padStart(2, '0');
     const year = parseInt(yearStr, 10);
     const month = parseInt(monthStr, 10);
     const daysInMonth = new Date(year, month, 0).getDate();
@@ -1344,16 +1440,19 @@ function initUserApp() {
     const todayStr = new Date().toISOString().slice(0, 10);
     const weekdaysBn = ['রবি', 'সোম', 'মঙ্গল', 'বুধ', 'বৃহঃ', 'শুক্র', 'শনি'];
 
-    const enrolls = JSON.parse(localStorage.getItem('meal_enrollments') || '[]');
-    const users = JSON.parse(localStorage.getItem('meal_users') || '[]');
-    const records = JSON.parse(localStorage.getItem('meal_records') || '[]');
+    let members = optMembers;
+    if (!members || !members.length) {
+      const enrolls = JSON.parse(localStorage.getItem('meal_enrollments') || '[]');
+      const users = JSON.parse(localStorage.getItem('meal_users') || '[]');
+      const approvedEnrolls = enrolls.filter(e => String(e.projectId || e.project_id) === String(projId) && String(e.status) === 'approved');
+      members = approvedEnrolls.map(e => {
+        const uid = String(e.userId || e.user_id);
+        const u = users.find(x => String(x.id) === uid) || { id: uid, name: 'সদস্য (' + uid.slice(0,4) + ')', photo: null };
+        return { id: uid, name: u.name, photo: u.photo };
+      }).sort((a, b) => a.name.localeCompare(b.name));
+    }
 
-    const approvedEnrolls = enrolls.filter(e => (e.projectId || e.project_id) === projId && e.status === 'approved');
-    const members = approvedEnrolls.map(e => {
-      const uid = e.userId || e.user_id;
-      const u = users.find(x => String(x.id) === String(uid)) || { id: uid, name: 'Member (' + String(uid).slice(0,4) + ')', photo: null };
-      return { id: uid, name: u.name, photo: u.photo };
-    }).sort((a, b) => a.name.localeCompare(b.name));
+    const records = optRecords || JSON.parse(localStorage.getItem('meal_records') || '[]');
 
     // Update member count KPI
     const kpiMem = document.getElementById(kpiMemId);
@@ -1363,6 +1462,10 @@ function initUserApp() {
       thead.innerHTML = `<tr><th>তারিখ / দিন</th><th class="sticky-total">মোট মিল</th></tr>`;
       tbody.innerHTML = `<tr><td colspan="2" class="tc text-muted" style="padding:2rem;">এই প্রজেক্টে এখনো কোনো অনুমোদিত সদস্য নেই।</td></tr>`;
       tfoot.innerHTML = '';
+      const kpiMonth = document.getElementById(kpiMonthId);
+      if (kpiMonth) kpiMonth.textContent = '0';
+      const kpiToday = document.getElementById(kpiTodayId);
+      if (kpiToday) kpiToday.textContent = '0';
       return;
     }
 
@@ -1407,7 +1510,7 @@ function initUserApp() {
 
       // Each Member's Meal Cell for day d
       members.forEach((m, mIdx) => {
-        const r = records.find(x => (x.projectId || x.project_id) === projId && (x.userId || x.user_id) === m.id && x.date === dStr);
+        const r = records.find(x => String(x.projectId || x.project_id) === String(projId) && String(x.userId || x.user_id) === String(m.id) && x.date === dStr);
         let count = 0;
         let details = [];
         if (r) {
