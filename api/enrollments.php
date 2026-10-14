@@ -86,6 +86,19 @@ if ($action === 'approve') {
     jsonResponse(['success' => true, 'message' => 'Member approved!']);
 }
 
+if ($action === 'reject') {
+    $data = getBody();
+    $projectId = $data['project_id'] ?? '';
+    $userId = $data['user_id'] ?? '';
+
+    if (!$projectId || !$userId) jsonResponse(['error' => 'Project ID and User ID required.'], 400);
+
+    $stmt = $db->prepare("DELETE FROM enrollments WHERE project_id = ? AND user_id = ? AND status = 'pending'");
+    $stmt->execute([$projectId, $userId]);
+
+    jsonResponse(['success' => true, 'message' => 'Request rejected.']);
+}
+
 if ($action === 'update_deposit') {
     $data = getBody();
     $projectId = $data['project_id'] ?? '';

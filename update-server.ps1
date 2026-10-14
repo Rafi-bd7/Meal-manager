@@ -41,7 +41,7 @@ function Upload-FtpFile($localFile, $remoteRelPath) {
 }
 
 Write-Host "Checking directories..." -ForegroundColor Cyan
-$dirs = @("api", "css", "icons", "js")
+$dirs = @("api", "css", "icons", "js", "sounds")
 foreach ($d in $dirs) {
     Make-FtpDir $d
 }

@@ -78,12 +78,17 @@ if ($action === 'state') {
 
     // Market Expenses
     $expenses = $db->query("SELECT me.id, me.project_id as projectId, me.user_id as userId,
+        COALESCE(NULLIF(me.shopper_name, ''), NULLIF(me.buyer_name, ''), u.name, 'সদস্য') as userName,
+        COALESCE(NULLIF(me.shopper_name, ''), NULLIF(me.buyer_name, ''), u.name, 'সদস্য') as shopperName,
+        me.shopper_name as customShopper,
+        me.created_by as createdBy,
         me.updated_by as updatedBy, me.date, me.item, me.amount, me.category, me.note,
         me.created_at as createdAt, me.updated_at as updatedAt,
-        u.name as userName, u2.name as updatedByName
+        u.name as uName, u2.name as updatedByName, u3.name as createdByName
         FROM market_expenses me
         LEFT JOIN users u ON me.user_id = u.id
         LEFT JOIN users u2 ON me.updated_by = u2.id
+        LEFT JOIN users u3 ON me.created_by = u3.id
         ORDER BY me.date DESC, me.created_at DESC LIMIT 500")->fetchAll();
     foreach ($expenses as &$ex) {
         $ex['amount'] = floatval($ex['amount']);

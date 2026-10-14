@@ -1,12 +1,13 @@
 <?php
 require_once __DIR__ . '/db.php';
 
-$action = $_GET['action'] ?? '';
+$data = getBody();
+$action = $_GET['action'] ?? ($data['action'] ?? '');
 $db = getDB();
 
 if ($action === 'list') {
-    $projectId = $_GET['project_id'] ?? '';
-    $toUser = $_GET['to'] ?? ''; // 'admin' or user ID
+    $projectId = $_GET['project_id'] ?? ($data['project_id'] ?? ($data['projectId'] ?? ''));
+    $toUser = $_GET['to'] ?? ($data['to'] ?? ($data['to_user'] ?? '')); // 'admin' or user ID
 
     if (!$projectId) jsonResponse(['notifications' => []]);
 
@@ -28,10 +29,9 @@ if ($action === 'list') {
 }
 
 if ($action === 'create' || $action === 'send') {
-    $data = getBody();
     $id = (string)time() . substr(md5(uniqid()), 0, 5);
-    $projectId = $data['project_id'] ?? '';
-    $to = $data['to'] ?? 'admin';
+    $projectId = $data['project_id'] ?? ($data['projectId'] ?? ($_GET['project_id'] ?? ''));
+    $to = $data['to'] ?? ($data['to_user'] ?? 'all');
     $message = $data['message'] ?? '';
     $time = time() * 1000;
 
@@ -44,8 +44,7 @@ if ($action === 'create' || $action === 'send') {
 }
 
 if ($action === 'delete') {
-    $data = getBody();
-    $id = $data['id'] ?? '';
+    $id = $data['id'] ?? ($_GET['id'] ?? '');
     if (!$id) jsonResponse(['error' => 'Notification ID required.'], 400);
 
     $stmt = $db->prepare("DELETE FROM notifications WHERE id = ?");
@@ -55,9 +54,9 @@ if ($action === 'delete') {
 }
 
 if ($action === 'delete_all' || $action === 'clear_all') {
-    $data = getBody();
-    $projectId = $data['project_id'] ?? '';
-    $userId = $data['user_id'] ?? '';
+    $projectId = $data['project_id'] ?? ($data['projectId'] ?? ($_GET['project_id'] ?? ''));
+    $userId = $data['user_id'] ?? ($data['userId'] ?? ($_GET['user_id'] ?? ''));
+
     if (!$projectId) jsonResponse(['error' => 'Project ID required.'], 400);
 
     if ($userId) {
@@ -68,7 +67,8 @@ if ($action === 'delete_all' || $action === 'clear_all') {
         $stmt->execute([$projectId]);
     }
 
-    jsonResponse(['success' => true, 'message' => 'All notifications deleted.']);
+    jsonResponse(['success' => true, 'message' => 'All notifications deleted.', 'deleted' => $stmt->rowCount()]);
 }
 
 jsonResponse(['error' => 'Invalid action.'], 400);
+

@@ -103,7 +103,18 @@ function initAdminApp() {
 
   function loadProjects() {
     const projects = JSON.parse(localStorage.getItem('meal_projects')) || [];
-    const enrolls = JSON.parse(localStorage.getItem('meal_enrollments')) || [];
+    let enrolls = JSON.parse(localStorage.getItem('meal_enrollments')) || [];
+
+    // Retroactive fix: ensure admin is enrolled in their own projects (for old projects)
+    let enrollsChanged = false;
+    projects.forEach(p => {
+      const pAdmin = p.adminId || p.admin_id;
+      if (pAdmin && !enrolls.find(e => (e.projectId || e.project_id) === p.id && (e.userId || e.user_id) === pAdmin)) {
+        enrolls.push({ id: p.id + '_' + pAdmin, projectId: p.id, userId: pAdmin, status: 'approved', moneyGiven: 0 });
+        enrollsChanged = true;
+      }
+    });
+    if (enrollsChanged) localStorage.setItem('meal_enrollments', JSON.stringify(enrolls));
     
     const myProjects = projects.filter(p => {
       const pAdmin = p.adminId || p.admin_id;
@@ -133,6 +144,7 @@ function initAdminApp() {
   }
   loadProjects();
   if (window.initChat) window.initChat(cur, () => curProjId);
+  if (window.MealNotifications) window.MealNotifications.startMonitor(cur, () => curProjId);
 
   // Create Project
   document.getElementById('newProjectBtn').addEventListener('click', () => {
@@ -157,6 +169,8 @@ function initAdminApp() {
         projects.push(res.project);
         localStorage.setItem('meal_projects', JSON.stringify(projects));
         curProjId = res.project.id;
+        // Sync to pull in admin's auto-enrollment
+        await window.API.syncState().catch(() => {});
       } else {
         const days = ['Saturday','Sunday','Monday','Tuesday','Wednesday','Thursday','Friday'];
         const menu = {}; days.forEach(d => menu[d] = {b:'', l:'', d:''});
@@ -164,6 +178,14 @@ function initAdminApp() {
         projects.push(p);
         localStorage.setItem('meal_projects', JSON.stringify(projects));
         curProjId = p.id;
+
+        // Auto-enroll admin as approved member (offline mode)
+        const enrolls = JSON.parse(localStorage.getItem('meal_enrollments')) || [];
+        const adminEnrollId = p.id + '_' + cur.id;
+        if (!enrolls.find(e => (e.projectId || e.project_id) === p.id && (e.userId || e.user_id) === cur.id)) {
+          enrolls.push({ id: adminEnrollId, projectId: p.id, userId: cur.id, status: 'approved', moneyGiven: 0 });
+          localStorage.setItem('meal_enrollments', JSON.stringify(enrolls));
+        }
       }
       
       showToast('Project Created!');
@@ -373,7 +395,10 @@ function initAdminApp() {
         rBody.innerHTML += `<tr>
           <td>${u.name} ${roleBadge}</td><td>${u.email}</td>
           <td><span class="badge badge-yellow">Pending</span></td>
-          <td><button class="btn btn-success btn-sm btn-approve" data-id="${u.id}"><i class="fas fa-check"></i> Accept</button></td>
+          <td style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button class="btn btn-success btn-sm btn-approve" data-id="${u.id}"><i class="fas fa-check"></i> Accept</button>
+            <button class="btn btn-danger btn-sm btn-reject" data-id="${u.id}"><i class="fas fa-times"></i> Reject</button>
+          </td>
         </tr>`;
       } else if (en.status === 'approved') {
         mBody.innerHTML += `<tr>
@@ -402,6 +427,22 @@ function initAdminApp() {
         refresh();
       } catch (err) {
         showToast(err.message || 'Error approving member', 'error');
+      }
+    }));
+
+    document.querySelectorAll('.btn-reject').forEach(b => b.addEventListener('click', async e => {
+      if(!confirm('Reject this member request?')) return;
+      const uid = e.currentTarget.dataset.id;
+      try {
+        if (window.API) {
+          await window.API.post('enrollments.php', { action: 'reject' }, { project_id: curProjId, user_id: uid });
+        }
+        const nf = enrolls.filter(x => !((x.projectId || x.project_id) === curProjId && (x.userId || x.user_id) === uid));
+        localStorage.setItem('meal_enrollments', JSON.stringify(nf));
+        showToast('Request rejected.', 'info');
+        refresh();
+      } catch (err) {
+        showToast(err.message || 'Error rejecting request', 'error');
       }
     }));
 
@@ -1010,6 +1051,8 @@ function initAdminApp() {
     }
     if (ed && !ed.value) ed.value = _todayStr;
 
+    populateShopperSelects();
+
     if (!_adminBazaarInited) {
       _adminBazaarInited = true;
       // Close edit modal
@@ -1029,6 +1072,21 @@ function initAdminApp() {
         const category = document.getElementById('editExpCategory')?.value || 'bazaar';
         const note = document.getElementById('editExpNote')?.value.trim() || '';
 
+        const editShopperSel = document.getElementById('editExpShopperSelect');
+        const editCustomShopperInp = document.getElementById('editExpCustomShopper');
+        let editUserId = cur.id;
+        let editShopperName = cur.name;
+        if (editShopperSel) {
+          if (editShopperSel.value === '__custom__') {
+            editShopperName = editCustomShopperInp?.value.trim() || 'অন্যান্য';
+            editUserId = cur.id;
+          } else if (editShopperSel.value) {
+            editUserId = editShopperSel.value;
+            const opt = editShopperSel.options[editShopperSel.selectedIndex];
+            editShopperName = opt ? (opt.dataset.name || opt.text.replace('👤 ','')) : cur.name;
+          }
+        }
+
         if (!id) return;
         if (!item) return showToast('পণ্যের নাম লিখুন', 'error');
         if (amount <= 0) return showToast('সঠিক টাকার পরিমাণ লিখুন', 'error');
@@ -1043,7 +1101,15 @@ function initAdminApp() {
           const expenses = JSON.parse(localStorage.getItem('meal_expenses')) || [];
           const idx = expenses.findIndex(x => x.id === id);
           if (idx > -1) {
-            expenses[idx] = { ...expenses[idx], date, item, amount, category, note, updatedBy: cur.id, updatedByName: cur.name };
+            expenses[idx] = {
+              ...expenses[idx],
+              date, item, amount, category, note,
+              userId: editUserId,
+              userName: editShopperName,
+              shopperName: editShopperName,
+              updatedBy: cur.id,
+              updatedByName: cur.name
+            };
             localStorage.setItem('meal_expenses', JSON.stringify(expenses));
           }
           document.getElementById('editExpModal')?.classList.remove('active');
@@ -1054,7 +1120,8 @@ function initAdminApp() {
             await window.API.post('expenses.php', { action: 'update' }, {
               id,
               project_id: curProjId,
-              user_id: cur.id,
+              user_id: editUserId,
+              shopper_name: editShopperName,
               updated_by: cur.id,
               date,
               item,
@@ -1072,6 +1139,77 @@ function initAdminApp() {
           btn.innerHTML = origText;
         }
       });
+    }
+  }
+
+  function populateShopperSelects() {
+    const addSel = document.getElementById('expShopperSelect');
+    const editSel = document.getElementById('editExpShopperSelect');
+    if (!addSel && !editSel) return;
+
+    const enrolls = JSON.parse(localStorage.getItem('meal_enrollments')) || [];
+    const users = JSON.parse(localStorage.getItem('meal_users')) || [];
+    const pMems = enrolls.filter(e => String(e.projectId || e.project_id) === String(curProjId) && e.status === 'approved');
+
+    const memberMap = new Map();
+    if (cur && cur.id) memberMap.set(cur.id, { id: cur.id, name: cur.name + ' (Admin)' });
+
+    pMems.forEach(en => {
+      const uid = en.userId || en.user_id;
+      const u = users.find(x => x.id === uid);
+      const name = u ? u.name : (en.name || 'সদস্য');
+      if (!memberMap.has(uid)) memberMap.set(uid, { id: uid, name: name });
+    });
+
+    // Populate addSel
+    if (addSel) {
+      const curVal = addSel.value || cur.id;
+      let optHtml = '';
+      memberMap.forEach(m => {
+        const isMe = m.id === cur.id;
+        optHtml += `<option value="${m.id}" data-name="${m.name.replace(' (Admin)','')}">${isMe ? '👤 আমি নিজে (' + cur.name + ')' : '👤 ' + m.name}</option>`;
+      });
+      optHtml += `<option value="__custom__">✍️ অন্য কারো নাম লিখুন...</option>`;
+      addSel.innerHTML = optHtml;
+      addSel.value = curVal;
+      if (!addSel.value) addSel.value = cur.id;
+
+      if (!addSel.dataset.hasListener) {
+        addSel.dataset.hasListener = 'true';
+        addSel.addEventListener('change', () => {
+          const customInp = document.getElementById('expCustomShopper');
+          if (addSel.value === '__custom__') {
+            customInp?.classList.remove('hidden');
+            customInp?.focus();
+          } else {
+            customInp?.classList.add('hidden');
+          }
+        });
+      }
+    }
+
+    // Populate editSel
+    if (editSel) {
+      let optHtml = '';
+      memberMap.forEach(m => {
+        const isMe = m.id === cur.id;
+        optHtml += `<option value="${m.id}" data-name="${m.name.replace(' (Admin)','')}">${isMe ? '👤 আমি নিজে (' + cur.name + ')' : '👤 ' + m.name}</option>`;
+      });
+      optHtml += `<option value="__custom__">✍️ অন্য কারো নাম লিখুন...</option>`;
+      editSel.innerHTML = optHtml;
+
+      if (!editSel.dataset.hasListener) {
+        editSel.dataset.hasListener = 'true';
+        editSel.addEventListener('change', () => {
+          const customInp = document.getElementById('editExpCustomShopper');
+          if (editSel.value === '__custom__') {
+            customInp?.classList.remove('hidden');
+            customInp?.focus();
+          } else {
+            customInp?.classList.add('hidden');
+          }
+        });
+      }
     }
   }
   initExpenseControls();
@@ -1113,35 +1251,38 @@ function initAdminApp() {
     if (!body) return;
     body.innerHTML = '';
     if (!filtered.length) {
-      body.innerHTML = `<tr><td colspan="7" class="text-center text-muted" style="padding:2rem;"><i class="fas fa-shopping-basket" style="opacity:.4; font-size:2rem; display:block; margin-bottom:.5rem;"></i>${month} মাসে কোনো বাজার খরচের এন্ট্রি নেই।</td></tr>`;
+      body.innerHTML = `<tr><td colspan="8" class="text-center text-muted" style="padding:2rem;"><i class="fas fa-shopping-basket" style="opacity:.4; font-size:2rem; display:block; margin-bottom:.5rem;"></i>${month} মাসে কোনো বাজার খরচের এন্ট্রি নেই।</td></tr>`;
     } else {
       // Sort by date desc
       [...filtered].sort((a, b) => b.date.localeCompare(a.date)).forEach(ex => {
         const u = users.find(x => x.id === (ex.userId || ex.user_id));
-        let adderName = ex.userName || (u ? u.name : 'মেম্বার');
-        if ((ex.userId || ex.user_id) === cur.id) {
-          adderName = `<strong>${adderName}</strong> <span class="badge badge-blue" style="font-size:0.65rem;">You</span>`;
+        let shopperName = ex.shopperName || ex.shopper_name || ex.userName || (u ? u.name : 'মেম্বার');
+        const isMyBazaar = (ex.userId || ex.user_id) === cur.id || shopperName === cur.name;
+
+        let adderName = ex.createdByName || ex.createdBy;
+        if (!adderName && ex.createdBy) {
+          const uAdd = users.find(x => x.id === ex.createdBy);
+          if (uAdd) adderName = uAdd.name;
         }
+        if (!adderName) adderName = ex.userName || (u ? u.name : 'সদস্য');
 
         let updaterName = ex.updatedByName;
         if (!updaterName && (ex.updatedBy || ex.updated_by)) {
           const u2 = users.find(x => x.id === (ex.updatedBy || ex.updated_by));
           if (u2) updaterName = u2.name;
         }
-        if ((ex.updatedBy || ex.updated_by) === cur.id) {
-          updaterName = `${updaterName || 'You'} <span class="badge badge-yellow" style="font-size:0.65rem;">You</span>`;
-        }
+
+        const shopperBadge = `<span class="badge badge-purple" style="font-size:0.82rem; font-weight:600;"><i class="fas fa-shopping-bag" style="margin-right:4px;"></i>${shopperName}${isMyBazaar ? ' <span class="badge badge-blue" style="font-size:0.6rem; margin-left:3px;">You</span>' : ''}</span>`;
+        const entryInfo = `<div style="font-size:0.85rem; font-weight:600; color:var(--text-muted);"><i class="fas fa-user-edit" style="font-size:0.75rem;"></i> ${adderName}</div>${updaterName ? `<div style="font-size:0.73rem; color:#f59e0b; margin-top:2px;"><i class="fas fa-history" style="font-size:0.7rem;"></i> আপডেট: ${updaterName}</div>` : ''}`;
 
         const catIcon = ex.category === 'bazaar' ? '🛒' : '📦';
         body.innerHTML += `<tr>
           <td style="white-space:nowrap;"><i class="far fa-calendar-alt text-muted" style="margin-right:4px;"></i>${ex.date}</td>
+          <td>${shopperBadge}</td>
           <td><strong>${ex.item}</strong></td>
           <td class="tc"><span class="badge badge-blue">${catIcon} ${ex.category === 'bazaar' ? 'বাজার' : 'অন্যান্য'}</span></td>
           <td class="tc font-bold text-gradient">${parseFloat(ex.amount).toFixed(2)} ৳</td>
-          <td>
-            <div style="font-weight:600; font-size:0.88rem;">${adderName}</div>
-            ${updaterName ? `<div style="font-size:0.75rem; color:#f59e0b; margin-top:3px;"><i class="fas fa-history" style="font-size:0.7rem;"></i> আপডেট: ${updaterName}</div>` : ''}
-          </td>
+          <td>${entryInfo}</td>
           <td style="font-size:.82rem; color:var(--text-muted);">${ex.note || '—'}</td>
           <td class="tc" style="white-space:nowrap;">
             <button class="btn btn-outline btn-sm btn-edit-exp" data-id="${ex.id}" title="সম্পাদনা করুন" style="padding:.25rem .5rem; font-size:.78rem; margin-right:4px;"><i class="fas fa-edit"></i></button>
@@ -1167,12 +1308,32 @@ function initAdminApp() {
       const eid = e.currentTarget.dataset.id;
       const ex = projExpenses.find(x => x.id === eid);
       if (!ex) return;
+      populateShopperSelects();
       document.getElementById('editExpId').value = ex.id;
       document.getElementById('editExpDate').value = ex.date;
       document.getElementById('editExpItem').value = ex.item;
       document.getElementById('editExpAmount').value = ex.amount;
       document.getElementById('editExpCategory').value = ex.category || 'bazaar';
       document.getElementById('editExpNote').value = ex.note || '';
+
+      const shopperUserId = ex.userId || ex.user_id;
+      const shopperNameVal = ex.shopperName || ex.shopper_name || ex.userName || '';
+      const editShopperSel = document.getElementById('editExpShopperSelect');
+      const editCustomShopperInp = document.getElementById('editExpCustomShopper');
+      if (editShopperSel) {
+        const hasOpt = Array.from(editShopperSel.options).some(o => o.value === shopperUserId && o.value !== '__custom__');
+        if (hasOpt) {
+          editShopperSel.value = shopperUserId;
+          editCustomShopperInp?.classList.add('hidden');
+        } else {
+          editShopperSel.value = '__custom__';
+          if (editCustomShopperInp) {
+            editCustomShopperInp.value = shopperNameVal;
+            editCustomShopperInp.classList.remove('hidden');
+          }
+        }
+      }
+
       document.getElementById('editExpModal')?.classList.add('active');
     }));
 
@@ -1206,6 +1367,21 @@ function initAdminApp() {
     const cat    = document.getElementById('expCategory').value;
     const note   = document.getElementById('expNote').value.trim();
 
+    const shopperSel = document.getElementById('expShopperSelect');
+    const customShopperInp = document.getElementById('expCustomShopper');
+    let shopperUserId = cur.id;
+    let shopperName = cur.name;
+    if (shopperSel) {
+      if (shopperSel.value === '__custom__') {
+        shopperName = customShopperInp?.value.trim() || 'অন্যান্য';
+        shopperUserId = cur.id;
+      } else if (shopperSel.value) {
+        shopperUserId = shopperSel.value;
+        const selectedOpt = shopperSel.options[shopperSel.selectedIndex];
+        shopperName = selectedOpt ? (selectedOpt.dataset.name || selectedOpt.text.replace('👤 ','')) : cur.name;
+      }
+    }
+
     if (!item) return showToast('পণ্যের নাম লিখুন', 'error');
     if (amount <= 0) return showToast('সঠিক টাকার পরিমাণ দিন', 'error');
 
@@ -1217,8 +1393,11 @@ function initAdminApp() {
       const newExp = {
         id: 'exp_' + Date.now(),
         projectId: curProjId,
-        userId: cur.id,
-        userName: cur.name,
+        userId: shopperUserId,
+        userName: shopperName,
+        shopperName: shopperName,
+        createdBy: cur.id,
+        createdByName: cur.name,
         date,
         item,
         amount,
@@ -1235,13 +1414,17 @@ function initAdminApp() {
       document.getElementById('expItem').value = '';
       document.getElementById('expAmount').value = '';
       document.getElementById('expNote').value = '';
+      if (customShopperInp) customShopperInp.value = '';
       showToast('খরচ সফলভাবে যোগ করা হয়েছে! 🛒');
       loadBazaar();
 
       // 3. Persist to API
       if (window.API) {
         const res = await window.API.post('expenses.php', { action: 'add' }, {
-          project_id: curProjId, user_id: cur.id,
+          project_id: curProjId,
+          user_id: shopperUserId,
+          shopper_name: shopperName,
+          created_by: cur.id,
           date, item, amount, category: cat, note
         });
         if (res && res.expense && res.expense.id) {
@@ -1645,23 +1828,8 @@ function initAdminApp() {
 
   // ─── Device Push Notification Helper ───
   function triggerDeviceNotification(title, body) {
-    if (!('Notification' in window)) return;
-    if (Notification.permission === 'granted') {
-      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-        navigator.serviceWorker.ready.then(reg => {
-          reg.showNotification(title, {
-            body: body,
-            icon: 'icons/icon-192.png',
-            badge: 'icons/icon-192.png',
-            vibrate: [200, 100, 200],
-            tag: 'meal-notice-' + Date.now()
-          });
-        }).catch(() => {
-          try { new Notification(title, { body, icon: 'icons/icon-192.png' }); } catch(e){}
-        });
-      } else {
-        try { new Notification(title, { body, icon: 'icons/icon-192.png' }); } catch(e){}
-      }
+    if (window.MealNotifications?.showDeviceNotification) {
+      window.MealNotifications.showDeviceNotification(title, body, { soundType: 'notice' });
     }
   }
 
@@ -1712,6 +1880,25 @@ function initAdminApp() {
     });
   }
 
+  // Clear all admin notices button handler
+  document.getElementById('clearAllAdminNoticesBtn')?.addEventListener('click', async () => {
+    if (!curProjId) return showToast('প্রথমে একটি প্রজেক্ট সিলেক্ট করুন!', 'error');
+    if (!confirm('আপনি কি এই প্রজেক্টের সকল নোটিশ মুছে ফেলতে চান?')) return;
+    try {
+      if (window.API) {
+        await window.API.post('notifications.php', { action: 'clear_all' }, { project_id: curProjId });
+        await window.API.syncState();
+      } else {
+        const notifs = JSON.parse(localStorage.getItem('meal_notifications')) || [];
+        localStorage.setItem('meal_notifications', JSON.stringify(notifs.filter(x => (x.projectId || x.project_id) !== curProjId)));
+      }
+      showToast('সকল নোটিশ সফলভাবে মুছে ফেলা হয়েছে।');
+      loadNotices();
+    } catch (err) {
+      showToast(err.message || 'Error clearing notices', 'error');
+    }
+  });
+
   document.getElementById('sendNoticeBtn')?.addEventListener('click', async () => {
     const input = document.getElementById('noticeMessageInput');
     const msg = input?.value.trim();
@@ -1733,7 +1920,6 @@ function initAdminApp() {
       }
       input.value = '';
       showToast('ঘোষণা ও নোটিফিকেশন সফলভাবে পাঠানো হয়েছে!');
-      triggerDeviceNotification('MealManager Announcement', msg);
       if (window.API) await window.API.syncState();
       loadNotices();
     } catch (err) {
@@ -1745,19 +1931,8 @@ function initAdminApp() {
   });
 
   document.getElementById('testNotifyBtn')?.addEventListener('click', async () => {
-    if (!('Notification' in window)) {
-      return showToast('এই ব্রাউজার নোটিফিকেশন সাপোর্ট করে না', 'error');
-    }
-    try {
-      const perm = await Notification.requestPermission();
-      if (perm === 'granted') {
-        triggerDeviceNotification('MealManager', 'নোটিফিকেশন সফলভাবে সক্রিয় হয়েছে! ✓');
-        showToast('নোটিফিকেশন পারমিশন চালু হয়েছে!');
-      } else {
-        showToast('নোটিফিকেশন পারমিশন দেওয়া হয়নি!', 'error');
-      }
-    } catch(e) {
-      showToast('Permission error: ' + e.message, 'error');
+    if (window.MealNotifications?.requestPermission) {
+      await window.MealNotifications.requestPermission();
     }
   });
 }

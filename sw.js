@@ -1,5 +1,5 @@
-// MealManager Service Worker — v16.0
-const CACHE_NAME = 'mealmanager-v16';
+// MealManager Service Worker — v19.0
+const CACHE_NAME = 'mealmanager-v19';
 const OFFLINE_URL = 'login.html';
 
 // Assets to cache immediately on install
@@ -15,6 +15,9 @@ const STATIC_ASSETS = [
   'js/admin.js',
   'js/user.js',
   'js/chat.js',
+  'js/notifications.js',
+  'sounds/message.wav',
+  'sounds/notification.wav',
   'manifest.json',
   'icons/icon-192.png',
   'icons/icon-512.png'
@@ -131,7 +134,10 @@ self.addEventListener('push', event => {
       body: data.body || 'Check your meal dashboard.',
       icon: 'icons/icon-192.png',
       badge: 'icons/icon-192.png',
-      vibrate: [200, 100, 200],
+      vibrate: data.vibrate || [300, 100, 300, 100, 300],
+      sound: data.sound || 'sounds/notification.wav',
+      renotify: true,
+      tag: data.tag || ('meal-notice-' + Date.now()),
       data: { url: data.url || './' }
     })
   );

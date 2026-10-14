@@ -44,6 +44,11 @@ if ($action === 'create') {
     $stmt = $db->prepare("INSERT INTO projects (id, name, admin_id, menu) VALUES (?, ?, ?, ?)");
     $stmt->execute([$id, $name, $adminId, json_encode($menu)]);
 
+    // Auto-enroll admin as an approved member so they are counted in bills & finances
+    $enrollId = $id . '_' . $adminId;
+    $enrollStmt = $db->prepare("INSERT IGNORE INTO enrollments (id, project_id, user_id, status, money_given) VALUES (?, ?, ?, 'approved', 0.00)");
+    $enrollStmt->execute([$enrollId, $id, $adminId]);
+
     jsonResponse([
         'success' => true,
         'message' => 'Project created successfully!',

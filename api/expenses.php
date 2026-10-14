@@ -11,14 +11,21 @@ if ($action === 'list') {
     $month = $_GET['month'] ?? ''; // YYYY-MM
     if (!$pid) jsonResponse(['error' => 'project_id required'], 400);
 
-    $sql = "SELECT me.id, me.project_id as projectId, me.user_id as userId, me.date,
-                   me.item, me.amount, me.category, me.note, me.created_at, me.updated_at,
+    $sql = "SELECT me.id, me.project_id as projectId, me.user_id as userId,
+                   COALESCE(NULLIF(me.shopper_name, ''), NULLIF(me.buyer_name, ''), u.name, 'সদস্য') as userName,
+                   COALESCE(NULLIF(me.shopper_name, ''), NULLIF(me.buyer_name, ''), u.name, 'সদস্য') as shopperName,
+                   me.shopper_name as customShopper,
+                   me.created_by as createdBy,
+                   me.date, me.item, me.amount, me.category, me.note,
+                   me.created_at, me.updated_at,
                    me.updated_by as updatedBy,
-                   u.name as userName,
-                   u2.name as updatedByName
+                   u.name as uName,
+                   u2.name as updatedByName,
+                   u3.name as createdByName
             FROM market_expenses me
             LEFT JOIN users u ON me.user_id = u.id
             LEFT JOIN users u2 ON me.updated_by = u2.id
+            LEFT JOIN users u3 ON me.created_by = u3.id
             WHERE me.project_id = ?";
     $params = [$pid];
 
@@ -38,6 +45,8 @@ if ($action === 'add') {
     $data = getBody();
     $pid    = $data['project_id'] ?? '';
     $uid    = $data['user_id'] ?? '';
+    $shopperName = trim($data['shopper_name'] ?? ($data['buyer_name'] ?? ''));
+    $createdBy = $data['created_by'] ?? $uid;
     $date   = $data['date'] ?? date('Y-m-d');
     $item   = trim($data['item'] ?? '');
     $amount = floatval($data['amount'] ?? 0);
@@ -49,13 +58,32 @@ if ($action === 'add') {
     }
 
     $id = 'exp_' . uniqid();
-    $stmt = $db->prepare("INSERT INTO market_expenses (id, project_id, user_id, date, item, amount, category, note)
-                           VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-    $stmt->execute([$id, $pid, $uid, $date, $item, $amount, $cat, $note]);
+    $stmt = $db->prepare("INSERT INTO market_expenses (id, project_id, user_id, shopper_name, buyer_name, created_by, date, item, amount, category, note)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $stmt->execute([$id, $pid, $uid, $shopperName, $shopperName, $createdBy, $date, $item, $amount, $cat, $note]);
+
+    // Dispatch a project notification so everyone's device is alerted
+    $uName = '';
+    try {
+        $uStmt = $db->prepare("SELECT name FROM users WHERE id = ?");
+        $uStmt->execute([$uid]);
+        $uRow = $uStmt->fetch();
+        $uName = $uRow['name'] ?? '';
+        $shopperDisplay = $shopperName ?: ($uName ?: 'মেম্বার');
+        
+        $notifId = (string)time() . substr(md5(uniqid()), 0, 5);
+        $notifMsg = "🛒 {$shopperDisplay} {$item} ({$amount}৳) বাজার খরচ যোগ করেছেন।";
+        $notifTime = time() * 1000;
+        $db->prepare("INSERT INTO notifications (id, project_id, to_user, message, time) VALUES (?, ?, 'all', ?, ?)")
+           ->execute([$notifId, $pid, $notifMsg, $notifTime]);
+    } catch (Exception $e) {}
 
     jsonResponse([
         'success' => true,
         'expense' => ['id' => $id, 'projectId' => $pid, 'userId' => $uid,
+                      'userName' => $shopperName ?: ($uName ?: 'সদস্য'),
+                      'shopperName' => $shopperName ?: ($uName ?: 'সদস্য'),
+                      'createdBy' => $createdBy,
                       'date' => $date, 'item' => $item, 'amount' => $amount,
                       'category' => $cat, 'note' => $note]
     ], 201);
@@ -66,6 +94,8 @@ if ($action === 'update' || $action === 'edit') {
     $data = getBody();
     $id        = $data['id'] ?? '';
     $pid       = $data['project_id'] ?? '';
+    $uid       = $data['user_id'] ?? '';
+    $shopperName = isset($data['shopper_name']) ? trim($data['shopper_name']) : (isset($data['buyer_name']) ? trim($data['buyer_name']) : null);
     $updatedBy = $data['updated_by'] ?? ($data['user_id'] ?? null);
     $date      = $data['date'] ?? '';
     $item      = trim($data['item'] ?? '');
@@ -77,16 +107,22 @@ if ($action === 'update' || $action === 'edit') {
         jsonResponse(['error' => 'id, date, item and amount are required'], 400);
     }
 
-    if ($pid) {
-        $stmt = $db->prepare("UPDATE market_expenses
-                              SET date = ?, item = ?, amount = ?, category = ?, note = ?, updated_by = ?, updated_at = NOW()
-                              WHERE id = ? AND project_id = ?");
-        $stmt->execute([$date, $item, $amount, $cat, $note, $updatedBy, $id, $pid]);
+    if ($uid) {
+        $sql = "UPDATE market_expenses
+                SET date = ?, item = ?, amount = ?, category = ?, note = ?, user_id = ?, shopper_name = ?, buyer_name = ?, updated_by = ?, updated_at = NOW()
+                WHERE id = ?" . ($pid ? " AND project_id = ?" : "");
+        $params = [$date, $item, $amount, $cat, $note, $uid, $shopperName, $shopperName, $updatedBy, $id];
+        if ($pid) $params[] = $pid;
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
     } else {
-        $stmt = $db->prepare("UPDATE market_expenses
-                              SET date = ?, item = ?, amount = ?, category = ?, note = ?, updated_by = ?, updated_at = NOW()
-                              WHERE id = ?");
-        $stmt->execute([$date, $item, $amount, $cat, $note, $updatedBy, $id]);
+        $sql = "UPDATE market_expenses
+                SET date = ?, item = ?, amount = ?, category = ?, note = ?, updated_by = ?, updated_at = NOW()
+                WHERE id = ?" . ($pid ? " AND project_id = ?" : "");
+        $params = [$date, $item, $amount, $cat, $note, $updatedBy, $id];
+        if ($pid) $params[] = $pid;
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
     }
 
     jsonResponse(['success' => true, 'message' => 'Expense updated successfully']);

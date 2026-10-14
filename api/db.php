@@ -114,6 +114,9 @@ function getDB() {
         $check = $pdo->query("SHOW TABLES LIKE 'users'")->fetch();
         if (!$check) {
             initTables($pdo);
+        } else {
+            // Always run column migrations to ensure new columns exist
+            runMigrations($pdo);
         }
 
         return $pdo;
@@ -177,8 +180,16 @@ function initTables($pdo) {
         INDEX (`project_id`)
     ) ENGINE=InnoDB");
 
+    runMigrations($pdo);
+}
+
+// Always-run migrations: adds any missing columns to existing tables
+function runMigrations($pdo) {
     // Auto-migrate: ensure market_expenses columns exist
     try {
+        $pdo->exec("ALTER TABLE `market_expenses` ADD COLUMN IF NOT EXISTS `shopper_name` VARCHAR(150) NULL");
+        $pdo->exec("ALTER TABLE `market_expenses` ADD COLUMN IF NOT EXISTS `buyer_name` VARCHAR(150) NULL");
+        $pdo->exec("ALTER TABLE `market_expenses` ADD COLUMN IF NOT EXISTS `created_by` VARCHAR(64) NULL");
         $pdo->exec("ALTER TABLE `market_expenses` ADD COLUMN IF NOT EXISTS `updated_by` VARCHAR(64) NULL");
         $pdo->exec("ALTER TABLE `market_expenses` ADD COLUMN IF NOT EXISTS `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP");
     } catch (Exception $e) {}
@@ -187,6 +198,40 @@ function initTables($pdo) {
     try {
         $pdo->exec("ALTER TABLE `comments` ADD COLUMN IF NOT EXISTS `reply` TEXT NULL");
         $pdo->exec("ALTER TABLE `comments` ADD COLUMN IF NOT EXISTS `reply_time` BIGINT NULL");
+    } catch (Exception $e) {}
+
+    // Auto-migrate chats: reply & reactions columns
+    try {
+        $pdo->exec("ALTER TABLE `chats` ADD COLUMN IF NOT EXISTS `reply_to` VARCHAR(64) NULL");
+        $pdo->exec("ALTER TABLE `chats` ADD COLUMN IF NOT EXISTS `reply_text` TEXT NULL");
+        $pdo->exec("ALTER TABLE `chats` ADD COLUMN IF NOT EXISTS `reactions` TEXT NULL");
+    } catch (Exception $e) {}
+
+    // Auto-create chat_presence table for typing/online status
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS `chat_presence` (
+            `user_id` VARCHAR(64) PRIMARY KEY,
+            `project_id` VARCHAR(64) NOT NULL,
+            `last_seen` BIGINT NOT NULL DEFAULT 0,
+            `is_typing` TINYINT(1) NOT NULL DEFAULT 0,
+            `typing_time` BIGINT NOT NULL DEFAULT 0,
+            `last_read_time` BIGINT NOT NULL DEFAULT 0,
+            INDEX (`project_id`)
+        ) ENGINE=InnoDB");
+    } catch (Exception $e) {}
+
+    // Auto-enroll existing project admins as approved members (retroactive fix)
+    try {
+        $pdo->exec("
+            INSERT IGNORE INTO enrollments (id, project_id, user_id, status, money_given)
+            SELECT CONCAT(p.id, '_', p.admin_id), p.id, p.admin_id, 'approved', 0.00
+            FROM projects p
+            WHERE p.admin_id IS NOT NULL AND p.admin_id != ''
+              AND NOT EXISTS (
+                SELECT 1 FROM enrollments e
+                WHERE e.project_id = p.id AND e.user_id = p.admin_id
+              )
+        ");
     } catch (Exception $e) {}
 }
 

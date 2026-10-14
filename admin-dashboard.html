@@ -24,12 +24,16 @@
     <div class="nav-brand"><i class="fas fa-utensils"></i> MealManager <span class="badge badge-blue" style="font-size:.65rem; margin-left:.25rem;">Admin</span></div>
     <div class="nav-links">
       <span id="adminNameDisplay" style="font-size:.9rem; font-weight:600; color:var(--text-muted);"></span>
+      <button id="globalNotifBell" class="btn btn-outline btn-sm" style="display:inline-flex; align-items:center; gap:5px; padding:0.35rem 0.65rem;" title="নোটিফিকেশন ও সাউন্ড টেস্ট / চালু করুন">
+        <i class="fas fa-bell"></i> <span class="notif-text-status" style="font-size:0.75rem;">সাউন্ড</span>
+      </button>
       <button class="theme-toggle" id="themeToggle" title="Toggle theme"></button>
       <button id="logoutBtn" class="btn btn-outline btn-sm"><i class="fas fa-sign-out-alt"></i> Logout</button>
     </div>
   </nav>
 
   <div class="container">
+    <div id="notifBannerContainer"></div>
     <!-- Project Bar -->
     <div class="glass-panel mb-3 flex items-center justify-between flex-wrap gap-3">
       <div class="flex items-center gap-3 flex-wrap">
@@ -190,8 +194,14 @@
         <!-- Add Expense Form -->
         <div class="glass-panel mb-3 fade-in" style="border-color:rgba(79,142,247,.3); padding:1.25rem;">
           <h4 style="font-size:.95rem; margin-bottom:1rem; font-weight:700;"><i class="fas fa-plus-circle" style="color:var(--primary);"></i> নতুন খরচ যোগ করুন</h4>
-          <div class="flex gap-3 flex-wrap">
-            <input type="date" id="expDate" class="form-control" style="min-width:140px; flex:0 0 auto;">
+          <div class="flex gap-3 flex-wrap items-center">
+            <input type="date" id="expDate" class="form-control" style="min-width:140px; flex:0 0 auto;" title="তারিখ">
+            <div style="flex:1.5; min-width:200px; display:flex; gap:6px;">
+              <select id="expShopperSelect" class="form-control" style="width:100%;" title="কে বাজার করেছে নির্বাচন করুন">
+                <option value="">👤 বাজার করেছে কে?</option>
+              </select>
+              <input type="text" id="expCustomShopper" class="form-control hidden" placeholder="বাজারকারীর নাম লিখুন..." style="width:100%;">
+            </div>
             <input type="text" id="expItem" class="form-control" placeholder="পণ্যের নাম (e.g. চাল, ডাল, তেল...)" style="flex:2; min-width:180px;">
             <input type="number" id="expAmount" class="form-control" placeholder="টাকার পরিমাণ" min="1" style="flex:1; min-width:130px;">
             <select id="expCategory" class="form-control" style="flex:0 0 auto; min-width:130px;">
@@ -199,7 +209,7 @@
               <option value="other">📦 অন্যান্য</option>
             </select>
             <input type="text" id="expNote" class="form-control" placeholder="নোট (ঐচ্ছিক)" style="flex:1; min-width:150px;">
-            <button id="addExpenseBtn" class="btn btn-primary"><i class="fas fa-plus"></i> যোগ করুন</button>
+            <button id="addExpenseBtn" class="btn btn-primary" style="white-space:nowrap;"><i class="fas fa-plus"></i> যোগ করুন</button>
           </div>
         </div>
 
@@ -209,10 +219,11 @@
             <thead>
               <tr>
                 <th>তারিখ</th>
+                <th>বাজার করেছে (নাম)</th>
                 <th>পণ্য</th>
                 <th class="tc">ধরন</th>
                 <th class="tc">টাকা (৳)</th>
-                <th>যোগ / আপডেট করেছে</th>
+                <th>এন্ট্রি / আপডেট</th>
                 <th>নোট</th>
                 <th class="tc">অ্যাকশন</th>
               </tr>
@@ -563,7 +574,12 @@
           </div>
         </div>
 
-        <h4 style="font-size:0.95rem; margin-top:1.5rem; margin-bottom:0.75rem;"><i class="fas fa-history"></i> পূর্ববর্তী নোটিশসমূহ</h4>
+        <div class="flex items-center justify-between flex-wrap gap-2 mt-4 mb-2">
+          <h4 style="font-size:0.95rem; margin:0;"><i class="fas fa-history"></i> পূর্ববর্তী নোটিশসমূহ</h4>
+          <button type="button" id="clearAllAdminNoticesBtn" class="btn btn-outline btn-sm" style="color:#ef4444; border-color:rgba(239,68,68,0.4);">
+            <i class="fas fa-trash-alt"></i> সব নোটিশ মুছুন
+          </button>
+        </div>
         <div id="noticesHistoryList" style="display:flex; flex-direction:column; gap:0.75rem;">
           <p class="text-muted text-center py-3">কোনো নোটিশ পাঠানো হয়নি।</p>
         </div>
@@ -582,6 +598,13 @@
       <div class="form-group mb-2">
         <label class="form-label" style="font-size:0.85rem; font-weight:600;">তারিখ</label>
         <input type="date" id="editExpDate" class="form-control">
+      </div>
+      <div class="form-group mb-2">
+        <label class="form-label" style="font-size:0.85rem; font-weight:600;">বাজার করেছে কে (সদস্য / নাম)</label>
+        <select id="editExpShopperSelect" class="form-control mb-1">
+          <option value="">👤 বাজার করেছে কে?</option>
+        </select>
+        <input type="text" id="editExpCustomShopper" class="form-control hidden" placeholder="বাজারকারীর নাম লিখুন...">
       </div>
       <div class="form-group mb-2">
         <label class="form-label" style="font-size:0.85rem; font-weight:600;">পণ্যের নাম</label>
@@ -610,6 +633,7 @@
   </div>
 
   <script src="js/api.js"></script>
+  <script src="js/notifications.js"></script>
   <script src="js/chat.js"></script>
   <script src="js/admin.js"></script>
   <script>
