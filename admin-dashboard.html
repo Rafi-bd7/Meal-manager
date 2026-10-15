@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#4f8ef7">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <link rel="stylesheet" href="css/styles.css?v=5">
+  <link rel="stylesheet" href="css/styles.css?v=25.0">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
@@ -24,6 +24,9 @@
     <div class="nav-brand"><i class="fas fa-utensils"></i> MealManager <span class="badge badge-blue" style="font-size:.65rem; margin-left:.25rem;">Admin</span></div>
     <div class="nav-links">
       <span id="adminNameDisplay" style="font-size:.9rem; font-weight:600; color:var(--text-muted);"></span>
+      <a href="user-dashboard.html" class="btn btn-outline btn-sm" style="display:inline-flex; align-items:center; gap:5px;" title="নিজের মেম্বার মিল ও প্রোফাইল ড্যাশবোর্ড দেখুন">
+        <i class="fas fa-user"></i> মেম্বার ভিউ
+      </a>
       <button id="globalNotifBell" class="btn btn-outline btn-sm" style="display:inline-flex; align-items:center; gap:5px; padding:0.35rem 0.65rem;" title="নোটিফিকেশন ও সাউন্ড টেস্ট / চালু করুন">
         <i class="fas fa-bell"></i> <span class="notif-text-status" style="font-size:0.75rem;">সাউন্ড</span>
       </button>
@@ -166,6 +169,10 @@
           </div>
         </div>
 
+        <div class="mobile-sheet-hint">
+          <span><i class="fas fa-arrows-left-right" style="color:var(--primary); margin-right:6px;"></i> সব মেম্বার ও দৈনিক মোট দেখতে ডানে-বামে সোয়াইপ করুন</span>
+          <span style="font-size:0.72rem; color:var(--text-muted);"><i class="fas fa-hand-pointer"></i> Touch &amp; Scroll</span>
+        </div>
         <div class="meal-sheet-container">
           <div class="meal-sheet-scroll">
             <table class="meal-sheet-table" id="adminMealSheetTable">
@@ -616,6 +623,9 @@
                 <i class="fas fa-user-check"></i> অ্যাডমিন যোগ / হস্তান্তর নিশ্চিত করুন
               </button>
             </div>
+
+            <!-- Current Co-Admins List & Removal Section -->
+            <div id="currentCoAdminsSection" style="margin-top:1.25rem; border-top:1px dashed var(--glass-border); padding-top:1rem;"></div>
           </div>
         </div>
       </div>
@@ -722,10 +732,10 @@
     </div>
   </div>
 
-  <script src="js/api.js?v=23.0"></script>
-  <script src="js/notifications.js?v=23.0"></script>
-  <script src="js/chat.js?v=23.0"></script>
-  <script src="js/admin.js?v=23.0"></script>
+  <script src="js/api.js?v=26.0"></script>
+  <script src="js/notifications.js?v=26.0"></script>
+  <script src="js/chat.js?v=26.0"></script>
+  <script src="js/admin.js?v=26.0"></script>
   <script>
     // Immediate auto-load of admin meal sheet
     document.addEventListener('DOMContentLoaded', () => {

@@ -58,13 +58,23 @@ if ($action === 'save') {
     ");
     $stmt->execute([$id, $projectId, $userId, $date, $b, $l, $d]);
 
-    // Add notification if saved by user
-    if (!empty($data['sender_name'])) {
-        $notifId = (string)time() . substr(md5(uniqid()), 0, 5);
-        $msg = "{$data['sender_name']} updated their meal for {$date}.";
-        $nStmt = $db->prepare("INSERT INTO notifications (id, project_id, to_user, message, time) VALUES (?, ?, 'admin', ?, ?)");
-        $nStmt->execute([$notifId, $projectId, $msg, time() * 1000]);
+    // Add notification when meal updated
+    $senderName = trim($data['sender_name'] ?? '');
+    if (!$senderName) {
+        $uStmt = $db->prepare("SELECT name FROM users WHERE id = ?");
+        $uStmt->execute([$userId]);
+        $uRow = $uStmt->fetch();
+        $senderName = $uRow ? $uRow['name'] : 'সদস্য';
     }
+
+    $bStr = $b ? 'সকাল: অন' : 'সকাল: অফ';
+    $lStr = $l ? 'দুপুর: অন' : 'দুপুর: অফ';
+    $dStr = $d ? 'রাত: অন' : 'রাত: অফ';
+    $notifMsg = "🍽️ মিল আপডেট: {$senderName} ({$date}) তারিখের মিল আপডেট করেছেন ({$bStr}, {$lStr}, {$dStr})।";
+
+    $notifId = (string)time() . substr(md5(uniqid()), 0, 5);
+    $nStmt = $db->prepare("INSERT INTO notifications (id, project_id, to_user, message, time) VALUES (?, ?, 'all', ?, ?)");
+    $nStmt->execute([$notifId, $projectId, $notifMsg, time() * 1000]);
 
     jsonResponse(['success' => true, 'message' => 'Meal saved successfully!']);
 }
@@ -100,11 +110,31 @@ if ($action === 'toggle') {
     ");
     $stmt->execute([$id, $projectId, $userId, $date, $b, $l, $d]);
 
-    // Send notification to member
+    // Get member name
+    $uStmt = $db->prepare("SELECT name FROM users WHERE id = ?");
+    $uStmt->execute([$userId]);
+    $uRow = $uStmt->fetch();
+    $memberName = $uRow ? $uRow['name'] : 'সদস্য';
+
+    // Get admin / changer name
+    $adminName = trim($data['admin_name'] ?? '');
+    if (!$adminName && !empty($data['admin_id'])) {
+        $aStmt = $db->prepare("SELECT name FROM users WHERE id = ?");
+        $aStmt->execute([$data['admin_id']]);
+        $aRow = $aStmt->fetch();
+        if ($aRow) $adminName = $aRow['name'];
+    }
+    if (!$adminName) $adminName = 'ম্যানেজার';
+
+    $newVal = ($type === 'breakfast') ? $b : (($type === 'lunch') ? $l : $d);
+    $typeBn = ($type === 'breakfast') ? 'সকালের' : (($type === 'lunch') ? 'দুপুরের' : 'রাতের');
+    $statusBn = $newVal ? 'অন (ON)' : 'অফ (OFF)';
+    $notifMsg = "🍽️ মিল পরিবর্তন: {$adminName} সদস্য {$memberName}-এর ({$date}) তারিখের {$typeBn} মিল {$statusBn} করেছেন।";
+
+    // Send notification to all members so everyone sees it
     $notifId = (string)time() . substr(md5(uniqid()), 0, 5);
-    $msg = "Admin updated your meal for {$date}.";
-    $nStmt = $db->prepare("INSERT INTO notifications (id, project_id, to_user, message, time) VALUES (?, ?, ?, ?, ?)");
-    $nStmt->execute([$notifId, $projectId, $userId, $msg, time() * 1000]);
+    $nStmt = $db->prepare("INSERT INTO notifications (id, project_id, to_user, message, time) VALUES (?, ?, 'all', ?, ?)");
+    $nStmt->execute([$notifId, $projectId, $notifMsg, time() * 1000]);
 
     jsonResponse(['success' => true, 'message' => 'Meal updated!']);
 }

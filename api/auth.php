@@ -86,6 +86,14 @@ if ($action === 'delete_user') {
     $userId = $data['user_id'] ?? '';
     if (!$userId) jsonResponse(['error' => 'User ID required.'], 400);
 
+    // Protection check: Cannot delete a user who is the primary admin of any project
+    $pStmt = $db->prepare("SELECT name FROM projects WHERE admin_id = ? OR creator_id = ?");
+    $pStmt->execute([$userId, $userId]);
+    $pRow = $pStmt->fetch();
+    if ($pRow) {
+        jsonResponse(['error' => "এই ইউজার '{$pRow['name']}' মেসের মূল প্রতিষ্ঠাতা/প্রধান অ্যাডমিন। তাকে ডাটাবেজ থেকে ডিলিট করা সম্ভব নয়।"], 403);
+    }
+
     $db->prepare("DELETE FROM users WHERE id = ?")->execute([$userId]);
     $db->prepare("DELETE FROM enrollments WHERE user_id = ?")->execute([$userId]);
     $db->prepare("DELETE FROM meal_records WHERE user_id = ?")->execute([$userId]);

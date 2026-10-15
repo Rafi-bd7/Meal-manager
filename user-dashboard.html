@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#4f8ef7">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <link rel="stylesheet" href="css/styles.css?v=5">
+  <link rel="stylesheet" href="css/styles.css?v=25.0">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
@@ -24,6 +24,9 @@
     <div class="nav-brand"><i class="fas fa-utensils"></i> MealManager</div>
     <div class="nav-links">
       <span id="userNameDisplay" style="font-size:.9rem; font-weight:600; color:var(--text-muted);"></span>
+      <a id="adminDashboardLink" href="admin-dashboard.html" class="btn btn-sm btn-primary hidden" style="background:linear-gradient(135deg, #f59e0b, #ef4444); color:#fff; font-weight:700; text-decoration:none; padding:0.35rem 0.75rem; border-radius:6px; display:inline-flex; align-items:center; gap:6px;">
+        <i class="fas fa-user-shield"></i> <span id="adminDashboardLinkText">অ্যাডমিন ড্যাশবোর্ড</span>
+      </a>
       <button id="globalNotifBell" class="btn btn-outline btn-sm" style="display:inline-flex; align-items:center; gap:5px; padding:0.35rem 0.65rem;" title="নোটিফিকেশন ও সাউন্ড টেস্ট / চালু করুন">
         <i class="fas fa-bell"></i> <span class="notif-text-status" style="font-size:0.75rem;">সাউন্ড</span>
       </button>
@@ -50,6 +53,7 @@
 
     <!-- Workspace -->
     <div id="userWorkspace" class="hidden fade-in">
+      <div id="coAdminBannerContainer"></div>
       <!-- Header -->
       <div class="glass-panel mb-3 flex items-center justify-between flex-wrap gap-3">
         <div>
@@ -162,6 +166,10 @@
           </div>
         </div>
 
+        <div class="mobile-sheet-hint">
+          <span><i class="fas fa-arrows-left-right" style="color:var(--primary); margin-right:6px;"></i> সব মেম্বার ও দৈনিক মোট দেখতে ডানে-বামে সোয়াইপ করুন</span>
+          <span style="font-size:0.72rem; color:var(--text-muted);"><i class="fas fa-hand-pointer"></i> Touch &amp; Scroll</span>
+        </div>
         <div class="meal-sheet-container">
           <div class="meal-sheet-scroll">
             <table class="meal-sheet-table" id="userMealSheetTable">
@@ -515,10 +523,10 @@
   </div>
 
 
-  <script src="js/api.js?v=22.0"></script>
-  <script src="js/notifications.js?v=22.0"></script>
-  <script src="js/chat.js?v=22.0"></script>
-  <script src="js/user.js?v=22.0"></script>
+  <script src="js/api.js?v=26.0"></script>
+  <script src="js/notifications.js?v=26.0"></script>
+  <script src="js/chat.js?v=26.0"></script>
+  <script src="js/user.js?v=26.0"></script>
   <script>
     // Immediate auto-load of meal sheet
     document.addEventListener('DOMContentLoaded', () => {

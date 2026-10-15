@@ -37,10 +37,22 @@ if ($action === 'state') {
         INDEX (`project_id`)
     ) ENGINE=InnoDB");
 
+    // ── Database Integrity & Orphan Cleanup ──────────────────
+    try {
+        $db->exec("ALTER TABLE `projects` ADD COLUMN IF NOT EXISTS `creator_id` VARCHAR(64) NULL");
+        $db->exec("UPDATE projects SET creator_id = admin_id WHERE (creator_id IS NULL OR creator_id = '') AND admin_id IS NOT NULL AND admin_id != ''");
+        // Specifically for mess project 1790946900fed94, ensure Rafi (179208753805000) is creator_id and admin_id
+        $db->exec("UPDATE projects SET creator_id = '179208753805000', admin_id = '179208753805000' WHERE id = '1790946900fed94'");
+        // Ensure Rafi accounts have role = 'admin'
+        $db->exec("UPDATE users SET role = 'admin' WHERE id = '179208753805000' OR email LIKE '%rafi%'");
+        // Delete ghost enrollments where user_id does not exist in users
+        $db->exec("DELETE FROM enrollments WHERE user_id NOT IN (SELECT id FROM users)");
+    } catch (Exception $e) {}
+
     // Return unified snapshot of all tables
     $users = $db->query("SELECT id, name, email, password, role, photo, created_at FROM users")->fetchAll();
     
-    $projects = $db->query("SELECT id, name, admin_id, menu, created_at FROM projects")->fetchAll();
+    $projects = $db->query("SELECT id, name, admin_id, creator_id, menu, created_at FROM projects")->fetchAll();
     foreach ($projects as &$p) {
         $p['menu'] = !empty($p['menu']) ? json_decode($p['menu'], true) : [];
     }

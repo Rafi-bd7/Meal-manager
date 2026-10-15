@@ -123,6 +123,14 @@ if ($action === 'remove') {
 
     if (!$projectId || !$userId) jsonResponse(['error' => 'Project ID and User ID required.'], 400);
 
+    // Protection check: Cannot remove project creator / primary admin
+    $pStmt = $db->prepare("SELECT admin_id, creator_id FROM projects WHERE id = ?");
+    $pStmt->execute([$projectId]);
+    $pRow = $pStmt->fetch();
+    if ($pRow && ((string)$pRow['admin_id'] === (string)$userId || (string)($pRow['creator_id'] ?? '') === (string)$userId)) {
+        jsonResponse(['error' => 'মেসের মূল প্রতিষ্ঠাতা/প্রধান অ্যাডমিনকে রিমুভ করা সম্ভব নয়।'], 403);
+    }
+
     $stmt = $db->prepare("DELETE FROM enrollments WHERE project_id = ? AND user_id = ?");
     $stmt->execute([$projectId, $userId]);
 

@@ -41,8 +41,11 @@ if ($action === 'create') {
     foreach ($days as $d) $menu[$d] = ['b'=>'', 'l'=>'', 'd'=>''];
 
     $id = (string)time() . substr(md5(uniqid()), 0, 5);
-    $stmt = $db->prepare("INSERT INTO projects (id, name, admin_id, menu) VALUES (?, ?, ?, ?)");
-    $stmt->execute([$id, $name, $adminId, json_encode($menu)]);
+    try {
+        $db->exec("ALTER TABLE `projects` ADD COLUMN IF NOT EXISTS `creator_id` VARCHAR(64) NULL");
+    } catch (Exception $e) {}
+    $stmt = $db->prepare("INSERT INTO projects (id, name, admin_id, creator_id, menu) VALUES (?, ?, ?, ?, ?)");
+    $stmt->execute([$id, $name, $adminId, $adminId, json_encode($menu)]);
 
     // Auto-enroll admin as an approved member so they are counted in bills & finances
     $enrollId = $id . '_' . $adminId;
@@ -166,4 +169,69 @@ if ($action === 'handover_manager') {
     ]);
 }
 
+if ($action === 'remove_coadmin' || $action === 'demote_coadmin') {
+    $data = getBody();
+    $projectId = $data['project_id'] ?? '';
+    $currentAdminId = $data['current_admin_id'] ?? '';
+    $targetUserId = $data['target_user_id'] ?? '';
+
+    if (!$projectId || !$currentAdminId || !$targetUserId) {
+        jsonResponse(['error' => 'Project ID, Current Admin ID, and Target User ID are required.'], 400);
+    }
+
+    // Verify project exists
+    $stmt = $db->prepare("SELECT id, name, admin_id, creator_id FROM projects WHERE id = ?");
+    $stmt->execute([$projectId]);
+    $project = $stmt->fetch();
+    if (!$project) {
+        jsonResponse(['error' => 'প্রজেক্ট পাওয়া যায়নি।'], 404);
+    }
+
+    // Verify current admin authority
+    $cStmt = $db->prepare("SELECT id, name, role FROM users WHERE id = ?");
+    $cStmt->execute([$currentAdminId]);
+    $currUser = $cStmt->fetch();
+    $isAuthorized = ($currUser && $currUser['role'] === 'admin') || (string)($project['admin_id'] ?? '') === (string)$currentAdminId || (string)($project['creator_id'] ?? '') === (string)$currentAdminId;
+    if (!$isAuthorized) {
+        jsonResponse(['error' => 'শুধুমাত্র প্রজেক্ট অ্যাডমিনই সহ-অ্যাডমিন পদ বাতিল করতে পারবেন।'], 403);
+    }
+
+    // Cannot demote primary creator/owner of project
+    if ((string)($project['admin_id'] ?? '') === (string)$targetUserId || (string)($project['creator_id'] ?? '') === (string)$targetUserId) {
+        jsonResponse(['error' => 'মেসের মূল প্রতিষ্ঠাতা/প্রধান ম্যানেজারের পদ বাতিল করা সম্ভব নয়।'], 400);
+    }
+
+    // Fetch target user info
+    $tStmt = $db->prepare("SELECT id, name, email FROM users WHERE id = ?");
+    $tStmt->execute([$targetUserId]);
+    $targetUser = $tStmt->fetch();
+    if (!$targetUser) {
+        jsonResponse(['error' => 'টার্গেট ব্যবহারকারী পাওয়া যায়নি।'], 404);
+    }
+
+    // Demote target user role to 'user'
+    $uStmt = $db->prepare("UPDATE users SET role = 'user' WHERE id = ?");
+    $uStmt->execute([$targetUserId]);
+
+    $currAdminName = $currUser ? $currUser['name'] : 'ম্যানেজার';
+    $targetName = $targetUser['name'];
+    $chatMsg = "👑 সহ-ম্যানেজার পদ প্রত্যাহার: {$currAdminName} মেসের সহ-অ্যাডমিন হিসেবে {$targetName}-এর দায়িত্ব প্রত্যাহার করেছেন এবং তাকে সাধারণ মেম্বার হিসেবে নির্ধারণ করেছেন।";
+
+    // Send announcement to chats
+    $chatId = 'c_' . time() . substr(md5(uniqid()), 0, 4);
+    $cChat = $db->prepare("INSERT INTO chats (id, project_id, user_id, user_name, text, time) VALUES (?, ?, ?, 'System', ?, ?)");
+    $cChat->execute([$chatId, $projectId, $currentAdminId, $chatMsg, time() * 1000]);
+
+    // Send notification to all members
+    $notifId = (string)time() . substr(md5(uniqid()), 0, 5);
+    $nStmt = $db->prepare("INSERT INTO notifications (id, project_id, to_user, message, time) VALUES (?, ?, 'all', ?, ?)");
+    $nStmt->execute([$notifId, $projectId, $chatMsg, time() * 1000]);
+
+    jsonResponse([
+        'success' => true,
+        'message' => "{$targetName}-এর সহ-অ্যাডমিন পদ বাতিল করা হয়েছে এবং তিনি এখন সাধারণ মেম্বার।"
+    ]);
+}
+
 jsonResponse(['error' => 'Invalid action.'], 400);
+

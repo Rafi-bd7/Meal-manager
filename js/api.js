@@ -124,6 +124,34 @@ const API = {
       setIfChanged('meal_expenses',      data.meal_expenses);
       setIfChanged('meal_bills',         data.meal_bills);
 
+      // Keep meal_currentUser synced with latest live role and profile
+      const curStr = localStorage.getItem('meal_currentUser');
+      if (curStr && Array.isArray(data.meal_users)) {
+        try {
+          const cur = JSON.parse(curStr);
+          const liveUser = data.meal_users.find(u => String(u.id) === String(cur.id));
+          if (liveUser) {
+            let userChanged = false;
+            if (liveUser.role && liveUser.role !== cur.role) {
+              cur.role = liveUser.role;
+              userChanged = true;
+            }
+            if (liveUser.name && liveUser.name !== cur.name) {
+              cur.name = liveUser.name;
+              userChanged = true;
+            }
+            if (liveUser.photo !== undefined && liveUser.photo !== cur.photo) {
+              cur.photo = liveUser.photo;
+              userChanged = true;
+            }
+            if (userChanged) {
+              localStorage.setItem('meal_currentUser', JSON.stringify(cur));
+              changed = true;
+            }
+          }
+        } catch(e) {}
+      }
+
       if (changed) {
         window.dispatchEvent(new Event('storage'));
         window.dispatchEvent(new Event('appDataSynced'));

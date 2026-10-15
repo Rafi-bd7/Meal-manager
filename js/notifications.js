@@ -329,16 +329,17 @@
           _seenNoticeIds.add(nid);
 
           const toTarget = n.to || n.to_user;
-          const isForMe = (toTarget === 'all' || String(toTarget) === String(_curMonitorUser.id));
+          const isForMe = (toTarget === 'all' || String(toTarget) === String(_curMonitorUser.id) || (toTarget === 'admin' && _curMonitorUser.role === 'admin'));
 
           if (isForMe) {
-            showDeviceNotification('📢 MealManager নোটিশ', n.message, {
+            const notifTitle = n.message.includes('🍽️') ? '🍽️ MealManager মিল আপডেট' : '📢 MealManager নোটিশ';
+            showDeviceNotification(notifTitle, n.message, {
               soundType: 'notice',
               tag: 'notice-' + nid,
               vibrate: [300, 100, 300, 100, 300]
             });
             if (window.showToast) {
-              window.showToast(`📢 ${n.message}`, 'info');
+              window.showToast(n.message, 'info');
             }
           }
         }

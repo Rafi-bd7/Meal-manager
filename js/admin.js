@@ -24,9 +24,23 @@ function showToast(msg, type = 'success') {
 }
 
 function initAdminApp() {
-  const cur = JSON.parse(localStorage.getItem('meal_currentUser'));
-  if (!cur || cur.role !== 'admin') {
+  let cur = JSON.parse(localStorage.getItem('meal_currentUser'));
+  if (!cur) {
     window.location.href = 'login.html';
+    return;
+  }
+  // Check live role from meal_users in case role was updated
+  const users = JSON.parse(localStorage.getItem('meal_users')) || [];
+  const liveUser = users.find(u => String(u.id) === String(cur.id));
+  const projects = JSON.parse(localStorage.getItem('meal_projects')) || [];
+  const isAnyProjectCreator = projects.some(p => String(p.creator_id || p.admin_id || p.adminId) === String(cur.id));
+  if (isAnyProjectCreator && cur.role !== 'admin') {
+    cur.role = 'admin';
+    localStorage.setItem('meal_currentUser', JSON.stringify(cur));
+  }
+  if (cur.role !== 'admin' && !isAnyProjectCreator) {
+    showToast('আপনার অ্যাডমিন ড্যাশবোর্ডের অ্যাক্সেস নেই। মেম্বার ড্যাশবোর্ডে নিয়ে যাওয়া হচ্ছে...', 'warning');
+    setTimeout(() => { window.location.href = 'user-dashboard.html'; }, 1000);
     return;
   }
   document.getElementById('adminNameDisplay').textContent = cur.name;
@@ -105,11 +119,12 @@ function initAdminApp() {
     const projects = JSON.parse(localStorage.getItem('meal_projects')) || [];
     let enrolls = JSON.parse(localStorage.getItem('meal_enrollments')) || [];
 
-    // Retroactive fix: ensure admin is enrolled in their own projects (for old projects)
+    // Retroactive fix: ensure admin is enrolled in their own projects (only if admin user exists)
     let enrollsChanged = false;
+    const users = JSON.parse(localStorage.getItem('meal_users')) || [];
     projects.forEach(p => {
       const pAdmin = p.adminId || p.admin_id;
-      if (pAdmin && !enrolls.find(e => (e.projectId || e.project_id) === p.id && (e.userId || e.user_id) === pAdmin)) {
+      if (pAdmin && users.some(u => String(u.id) === String(pAdmin)) && !enrolls.find(e => (e.projectId || e.project_id) === p.id && (e.userId || e.user_id) === pAdmin)) {
         enrolls.push({ id: p.id + '_' + pAdmin, projectId: p.id, userId: pAdmin, status: 'approved', moneyGiven: 0 });
         enrollsChanged = true;
       }
@@ -117,10 +132,11 @@ function initAdminApp() {
     if (enrollsChanged) localStorage.setItem('meal_enrollments', JSON.stringify(enrolls));
     
     const myProjects = projects.filter(p => {
-      const pAdmin = p.adminId || p.admin_id;
-      if (pAdmin === cur.id || !pAdmin) return true; // Creator or legacy
-      const en = enrolls.find(e => (e.projectId || e.project_id) === p.id && (e.userId || e.user_id) === cur.id && e.status === 'approved');
-      return !!en; // Approved co-admin
+      const pAdmin = String(p.adminId || p.admin_id || '');
+      const pCreator = String(p.creator_id || p.creatorId || '');
+      if (pAdmin === String(cur.id) || pCreator === String(cur.id) || !pAdmin) return true; // Creator or primary admin
+      const en = enrolls.find(e => String(e.projectId || e.project_id) === String(p.id) && String(e.userId || e.user_id) === String(cur.id) && e.status === 'approved');
+      return !!en; // Approved co-admin or enrolled admin
     });
     
     const sel = document.getElementById('projectSelect');
@@ -137,9 +153,18 @@ function initAdminApp() {
       sel.value = curProjId;
     } else if (curProjId && myProjects.find(p => p.id === curProjId)) {
       sel.value = curProjId;
+    } else if (myProjects.length > 0) {
+      curProjId = myProjects[myProjects.length - 1].id;
+      sel.value = curProjId;
     } else {
       curProjId = '';
       sel.value = '';
+    }
+
+    if (curProjId && sel.value === curProjId) {
+      setTimeout(() => {
+        sel.dispatchEvent(new Event('change'));
+      }, 50);
     }
   }
   loadProjects();
@@ -387,11 +412,19 @@ function initAdminApp() {
     const mBody = document.getElementById('membersBody');
     rBody.innerHTML = ''; mBody.innerHTML = '';
 
+    const projects = JSON.parse(localStorage.getItem('meal_projects')) || [];
+    const curP = projects.find(x => (x.id || x.projectId) === curProjId);
+    const pAdminId = curP ? String(curP.creator_id || curP.admin_id || curP.adminId) : '';
+
     pEnrolls.forEach(en => {
       const uid = en.userId || en.user_id;
-      const u = users.find(x => x.id === uid);
+      const u = users.find(x => String(x.id) === String(uid));
       if(!u) return;
-      const roleBadge = u.role === 'admin' ? `<span class="badge badge-purple" style="margin-left:5px;font-size:0.6rem;">Admin</span>` : '';
+      const isCreator = (String(u.id) === String(pAdminId) || (curP && String(u.id) === String(curP.creator_id)));
+      const isCoAdmin = (u.role === 'admin' && !isCreator);
+      const roleBadge = isCreator
+        ? `<span class="badge" style="background:linear-gradient(135deg, #f59e0b, #d97706); color:#fff; font-size:0.75rem; margin-left:5px;"><i class="fas fa-crown"></i> মেসের প্রতিষ্ঠাতা</span>`
+        : (u.role === 'admin' ? `<span class="badge badge-purple" style="margin-left:5px;font-size:0.68rem;"><i class="fas fa-user-shield"></i> সহ-অ্যাডমিন</span>` : '');
       if (en.status === 'pending') {
         rBody.innerHTML += `<tr>
           <td>${u.name} ${roleBadge}</td><td>${u.email}</td>
@@ -405,9 +438,12 @@ function initAdminApp() {
         mBody.innerHTML += `<tr>
           <td>${u.name} ${roleBadge}</td><td>${u.email}</td>
           <td><span class="badge badge-green"><i class="fas fa-check-circle"></i> Active</span></td>
-          <td class="tc">
-            <button class="btn btn-warning btn-sm btn-rem-mem-global" data-id="${u.id}" title="Remove from Project"><i class="fas fa-user-minus"></i></button>
-            <button class="btn btn-danger btn-sm btn-del-user" data-id="${u.id}" title="Delete User Completely"><i class="fas fa-trash"></i></button>
+          <td class="tc" style="display:flex; gap:6px; justify-content:center; flex-wrap:wrap; align-items:center;">
+            ${isCreator ? `<span class="badge badge-purple" style="font-size:0.75rem;"><i class="fas fa-shield-alt"></i> স্থায়ী অ্যাডমিন</span>` : `
+              ${(isCoAdmin && String(u.id) !== String(cur.id)) ? `<button type="button" class="btn btn-warning btn-sm btn-demote-coadmin" data-id="${u.id}" data-name="${u.name}" title="সহ-অ্যাডমিন পদ বাতিল করে সাধারণ সদস্য করুন" style="padding:0.25rem 0.55rem; font-size:0.75rem;"><i class="fas fa-user-times"></i> পদ বাতিল</button>` : ''}
+              <button class="btn btn-warning btn-sm btn-rem-mem-global" data-id="${u.id}" title="মেস থেকে রিমুভ করুন"><i class="fas fa-user-minus"></i></button>
+              <button class="btn btn-danger btn-sm btn-del-user" data-id="${u.id}" title="ইউজার চিরতরে ডিলিট করুন"><i class="fas fa-trash"></i></button>
+            `}
           </td>
         </tr>`;
       }
@@ -460,6 +496,31 @@ function initAdminApp() {
         refresh();
       } catch (err) {
         showToast(err.message || 'Error removing member', 'error');
+      }
+    }));
+
+    document.querySelectorAll('.btn-demote-coadmin').forEach(b => b.addEventListener('click', async e => {
+      const uid = e.currentTarget.dataset.id;
+      const uname = e.currentTarget.dataset.name || 'সদস্য';
+      if (!confirm(`আপনি কি নিশ্চিত যে "${uname}" এর সহ-অ্যাডমিন পদ বাতিল করে সাধারণ মেম্বার করতে চান?`)) return;
+      try {
+        if (window.API) {
+          await window.API.post('projects.php', { action: 'demote_coadmin' }, {
+            project_id: curProjId,
+            current_admin_id: cur.id,
+            target_user_id: uid
+          });
+        }
+        const uIdx = users.findIndex(x => String(x.id) === String(uid));
+        if (uIdx > -1) {
+          users[uIdx].role = 'user';
+          localStorage.setItem('meal_users', JSON.stringify(users));
+        }
+        showToast(`"${uname}" এর সহ-অ্যাডমিন পদ সফলভাবে বাতিল করা হয়েছে।`, 'success');
+        if (window.API) await window.API.syncState();
+        refresh();
+      } catch (err) {
+        showToast(err.message || 'সহ-অ্যাডমিন পদ বাতিল করতে সমস্যা হয়েছে', 'error');
       }
     }));
 
@@ -523,6 +584,55 @@ function initAdminApp() {
         handoverSelect.addEventListener('change', () => {
           handoverSelect.dataset.selectedVal = handoverSelect.value;
         });
+      }
+    }
+
+    // Render Current Co-Admins in Handover Card
+    const coAdminSec = document.getElementById('currentCoAdminsSection');
+    if (coAdminSec) {
+      const approvedMems = pEnrolls.filter(e => e.status === 'approved');
+      const coAdmins = [];
+      approvedMems.forEach(en => {
+        const uid = en.userId || en.user_id;
+        const u = users.find(x => String(x.id) === String(uid));
+        if (u && u.role === 'admin' && String(u.id) !== String(pAdminId)) {
+          coAdmins.push(u);
+        }
+      });
+
+      if (coAdmins.length === 0) {
+        coAdminSec.innerHTML = `
+          <div style="font-size:0.85rem; color:var(--text-muted); display:flex; align-items:center; gap:8px;">
+            <i class="fas fa-info-circle text-info"></i> বর্তমানে এই মেসে কোনো সহ-অ্যাডমিন নেই। উপরের ফর্ম থেকে মেম্বার নির্বাচন করে সহ-অ্যাডমিন যুক্ত করতে পারেন।
+          </div>`;
+      } else {
+        let coHtml = `
+          <div style="margin-bottom:8px; font-size:0.88rem; font-weight:700; color:var(--text);">
+            <i class="fas fa-crown text-warning"></i> বর্তমান সহ-অ্যাডমিনদের তালিকা (${coAdmins.length} জন):
+          </div>
+          <div style="display:flex; flex-direction:column; gap:8px;">`;
+        coAdmins.forEach(ca => {
+          const isMe = String(ca.id) === String(cur.id);
+          coHtml += `
+            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; padding:0.6rem 0.9rem; background:rgba(139,92,246,0.08); border:1px solid rgba(139,92,246,0.3); border-radius:8px;">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <div style="width:34px; height:34px; border-radius:50%; background:linear-gradient(135deg, #a855f7, #6366f1); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:0.85rem;">
+                  ${ca.name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <div style="font-weight:700; font-size:0.9rem; color:var(--text);">${ca.name} ${isMe ? '<span class="badge badge-purple" style="font-size:0.65rem;">(আপনি)</span>' : ''}</div>
+                  <div style="font-size:0.75rem; color:var(--text-muted);">${ca.email}</div>
+                </div>
+              </div>
+              <div>
+                ${!isMe ? `<button type="button" class="btn btn-danger btn-sm btn-demote-coadmin" data-id="${ca.id}" data-name="${ca.name}" style="padding:0.35rem 0.75rem; font-size:0.8rem;">
+                  <i class="fas fa-user-minus"></i> সহ-অ্যাডমিন পদ বাতিল করুন
+                </button>` : `<span class="badge badge-purple" style="font-size:0.75rem;">বর্তমান সেশন</span>`}
+              </div>
+            </div>`;
+        });
+        coHtml += `</div>`;
+        coAdminSec.innerHTML = coHtml;
       }
     }
   }
@@ -666,7 +776,14 @@ function initAdminApp() {
 
         try {
           if (window.API) {
-            await window.API.post('meals.php', { action: 'toggle' }, { project_id: curProjId, user_id: uid, date: dStr, type });
+            await window.API.post('meals.php', { action: 'toggle' }, {
+              project_id: curProjId,
+              user_id: uid,
+              date: dStr,
+              type,
+              admin_name: cur.name,
+              admin_id: cur.id
+            });
           }
           const u = users.find(x => x.id === uid);
           showToast(`Meal updated for ${u ? u.name : 'User'}!`);
@@ -1975,16 +2092,22 @@ function initAdminApp() {
     const notifs = JSON.parse(localStorage.getItem('meal_notifications')) || [];
     const list = document.getElementById('noticesHistoryList');
     if (!list) return;
-    const projNotifs = notifs.filter(n => (n.projectId || n.project_id) === curProjId && (n.to === 'all' || n.to_user === 'all'));
+    const projNotifs = notifs.filter(n => (n.projectId || n.project_id) === curProjId);
     if (!projNotifs.length) {
-      list.innerHTML = '<p class="text-muted text-center py-3">কোনো নোটিশ পাঠানো হয়নি।</p>';
+      list.innerHTML = '<p class="text-muted text-center py-3">কোনো নোটিশ বা মিল আপডেট নেই।</p>';
       return;
     }
     list.innerHTML = projNotifs.map(n => {
       const dStr = n.time ? new Date(parseInt(n.time)).toLocaleString('bn-BD', { dateStyle:'medium', timeStyle:'short' }) : '';
+      let badgeHtml = '<span class="badge badge-blue"><i class="fas fa-bullhorn"></i> ঘোষণা</span>';
+      if (n.message.includes('🍽️') || n.message.includes('মিল')) {
+        badgeHtml = '<span class="badge" style="background:#10b981; color:#fff;"><i class="fas fa-utensils"></i> মিল আপডেট</span>';
+      } else if (n.message.includes('👑') || n.message.includes('সহ-ম্যানেজার') || n.message.includes('হস্তান্তর')) {
+        badgeHtml = '<span class="badge badge-purple"><i class="fas fa-user-shield"></i> দায়িত্ব ব্যবস্থাপনা</span>';
+      }
       return `<div class="card p-3" style="background:var(--card-bg); border-radius:0.75rem; border:1px solid var(--glass-border);">
         <div class="flex justify-between items-center mb-2 flex-wrap gap-2">
-          <span class="badge badge-blue"><i class="fas fa-bullhorn"></i> ঘোষণা</span>
+          ${badgeHtml}
           <div class="flex items-center gap-2">
             <span class="text-muted" style="font-size:0.75rem;">${dStr}</span>
             <button type="button" class="btn btn-danger btn-sm btn-del-notice" data-id="${n.id}" title="নোটিশ মুছে ফেলুন" style="padding:.2rem .55rem; font-size:.75rem;">
@@ -2174,12 +2297,31 @@ function initAdminApp() {
     const users = JSON.parse(localStorage.getItem('meal_users') || '[]');
     const records = JSON.parse(localStorage.getItem('meal_records') || '[]');
 
-    const approvedEnrolls = enrolls.filter(e => String(e.projectId || e.project_id) === String(curProjId) && String(e.status) === 'approved');
+    const projects = JSON.parse(localStorage.getItem('meal_projects') || '[]');
+    const curP = projects.find(x => (x.id || x.projectId) === curProjId);
+    const pAdminId = curP ? String(curP.creator_id || curP.admin_id || curP.adminId) : '';
+
+    const approvedEnrolls = enrolls.filter(e => {
+      const isApproved = String(e.status) === 'approved';
+      const isThisProj = String(e.projectId || e.project_id) === String(curProjId);
+      const userExists = users.some(u => String(u.id) === String(e.userId || e.user_id));
+      return isApproved && isThisProj && userExists;
+    });
+
     const members = approvedEnrolls.map(e => {
       const uid = String(e.userId || e.user_id);
-      const u = users.find(x => String(x.id) === uid) || { id: uid, name: 'সদস্য (' + uid.slice(0,4) + ')', photo: null };
-      return { id: uid, name: u.name, photo: u.photo };
-    }).sort((a, b) => a.name.localeCompare(b.name));
+      const u = users.find(x => String(x.id) === uid);
+      return { 
+        id: uid, 
+        name: u ? u.name : 'সদস্য', 
+        photo: u ? u.photo : null,
+        isCreator: (uid === pAdminId || (curP && uid === String(curP.creator_id)))
+      };
+    }).sort((a, b) => {
+      if (a.isCreator) return -1;
+      if (b.isCreator) return 1;
+      return a.name.localeCompare(b.name);
+    });
 
     const kpiMem = document.getElementById('adminSheetTotalMembers');
     if (kpiMem) kpiMem.textContent = members.length + ' জন';
@@ -2196,21 +2338,22 @@ function initAdminApp() {
     }
 
     // 1. Build Header Row (Top: Member Names!)
-    let headHtml = `<tr><th class="sticky-col" style="min-width:100px;">তারিখ / দিন</th>`;
+    let headHtml = `<tr><th class="sticky-col">তারিখ / দিন</th>`;
     members.forEach(m => {
       const initial = (m.name || 'M').charAt(0).toUpperCase();
       const avatarHtml = m.photo
         ? `<img src="${m.photo}" style="width:26px; height:26px; border-radius:50%; object-fit:cover; border:1px solid var(--glass-border);">`
         : `<div style="width:26px; height:26px; border-radius:50%; background:var(--primary); color:#fff; display:inline-flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700;">${initial}</div>`;
       
-      headHtml += `<th class="tc" style="min-width:105px; padding:10px 8px;">
-        <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
+      headHtml += `<th class="tc" style="min-width:76px; padding:8px 4px;">
+        <div style="display:flex; flex-direction:column; align-items:center; gap:2px;">
           ${avatarHtml}
-          <span style="font-weight:700; font-size:0.85rem; max-width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${m.name}">${m.name}</span>
+          <span style="font-weight:700; font-size:0.8rem; max-width:85px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${m.name}">${m.name}</span>
+          ${m.isCreator ? '<span style="font-size:0.62rem; color:#f59e0b; font-weight:700; line-height:1;">(এডমিন)</span>' : ''}
         </div>
       </th>`;
     });
-    headHtml += `<th class="sticky-total tc" style="min-width:90px;">দৈনিক মোট</th></tr>`;
+    headHtml += `<th class="sticky-total tc">দৈনিক মোট</th></tr>`;
     thead.innerHTML = headHtml;
 
     // 2. Build Body Rows (Side: Dates 1 to 31!)

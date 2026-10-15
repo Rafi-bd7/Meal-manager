@@ -54,12 +54,25 @@ function getBillVal(obj, key1, key2) {
 }
 
 function initUserApp() {
-  const cur = JSON.parse(localStorage.getItem('meal_currentUser'));
-  if (!cur || cur.role !== 'user') {
+  let cur = JSON.parse(localStorage.getItem('meal_currentUser'));
+  if (!cur) {
     window.location.href = 'login.html';
     return;
   }
+  // Check live role from meal_users in case role was updated
+  const users = JSON.parse(localStorage.getItem('meal_users')) || [];
+  const liveUser = users.find(u => String(u.id) === String(cur.id));
+  if (liveUser && liveUser.role && cur.role !== liveUser.role) {
+    cur.role = liveUser.role;
+    localStorage.setItem('meal_currentUser', JSON.stringify(cur));
+  }
   document.getElementById('userNameDisplay').textContent = cur.name;
+  const adminLink = document.getElementById('adminDashboardLink');
+  const userProjects = JSON.parse(localStorage.getItem('meal_projects')) || [];
+  const isAnyProjectCreator = userProjects.some(p => String(p.creator_id || p.admin_id || p.adminId) === String(cur.id));
+  if ((cur.role === 'admin' || isAnyProjectCreator) && adminLink) {
+    adminLink.classList.remove('hidden');
+  }
   document.getElementById('logoutBtn').addEventListener('click', () => {
     localStorage.removeItem('meal_currentUser');
     window.location.href = 'login.html';
@@ -184,6 +197,32 @@ function initUserApp() {
       
       document.getElementById('joinSection').classList.add('hidden');
       document.getElementById('userWorkspace').classList.remove('hidden');
+
+      // Update Co-Admin Banner and Switcher
+      const adminLink = document.getElementById('adminDashboardLink');
+      const coBanner = document.getElementById('coAdminBannerContainer');
+      if (cur.role === 'admin') {
+        if (adminLink) adminLink.classList.remove('hidden');
+        if (coBanner) {
+          coBanner.innerHTML = `
+            <div class="card p-3 mb-3 flex items-center justify-between flex-wrap gap-2" style="background:linear-gradient(135deg, rgba(245,158,11,0.15), rgba(168,85,247,0.15)); border:1.5px solid rgba(245,158,11,0.4); border-radius:12px;">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <div style="font-size:1.5rem;">👑</div>
+                <div>
+                  <div style="font-weight:700; font-size:0.95rem; color:var(--text);">আপনি এই মেসের সহ-অ্যাডমিন / ম্যানেজার হিসেবে যুক্ত আছেন!</div>
+                  <div style="font-size:0.8rem; color:var(--text-muted);">মেসের সকল মেম্বার, মিল ট্র্যাকার, বাজার খরচ ও সেটিংস পরিচালনা করতে অ্যাডমিন ড্যাশবোর্ডে প্রবেশ করুন।</div>
+                </div>
+              </div>
+              <a href="admin-dashboard.html" class="btn btn-sm btn-primary" style="background:linear-gradient(135deg, #f59e0b, #ef4444); color:#fff; font-weight:700; padding:0.45rem 1rem;">
+                <i class="fas fa-user-shield"></i> অ্যাডমিন ড্যাশবোর্ডে যান
+              </a>
+            </div>
+          `;
+        }
+      } else {
+        if (adminLink) adminLink.classList.add('hidden');
+        if (coBanner) coBanner.innerHTML = '';
+      }
 
       if (curProj) {
         document.getElementById('projectTitle').innerHTML = curProj.name;
@@ -903,21 +942,27 @@ function initUserApp() {
     const list = document.getElementById('userNoticesList');
     const badge = document.getElementById('userNoticeBadge');
     if (!list || !curProj) return;
-    const projNotifs = notifs.filter(n => (n.projectId || n.project_id) === curProj.id && ((n.to || n.to_user) === 'all' || (n.to || n.to_user) === cur.id));
+    const projNotifs = notifs.filter(n => (n.projectId || n.project_id) === curProj.id && ((n.to || n.to_user) === 'all' || (n.to || n.to_user) === cur.id || ((n.to || n.to_user) === 'admin' && cur.role === 'admin')));
     if (!projNotifs.length) {
-      list.innerHTML = '<p class="text-muted text-center py-3">কোনো নোটিশ নেই।</p>';
+      list.innerHTML = '<p class="text-muted text-center py-3">কোনো নোটিশ বা মিল আপডেট নেই।</p>';
       if (badge) badge.style.display = 'none';
       return;
     }
     if (badge) badge.style.display = 'inline-flex';
     list.innerHTML = projNotifs.map(n => {
       const dStr = n.time ? new Date(parseInt(n.time)).toLocaleString('bn-BD', { dateStyle:'medium', timeStyle:'short' }) : '';
+      let badgeHtml = '<span class="badge badge-blue"><i class="fas fa-bullhorn"></i> নোটিশ</span>';
+      if (n.message.includes('🍽️') || n.message.includes('মিল')) {
+        badgeHtml = '<span class="badge" style="background:#10b981; color:#fff;"><i class="fas fa-utensils"></i> মিল আপডেট</span>';
+      } else if (n.message.includes('👑') || n.message.includes('সহ-ম্যানেজার') || n.message.includes('হস্তান্তর')) {
+        badgeHtml = '<span class="badge badge-purple"><i class="fas fa-user-shield"></i> দায়িত্ব ব্যবস্থাপনা</span>';
+      }
       return `<div class="card p-3" style="background:var(--card-bg); border-radius:0.75rem; border:1px solid var(--glass-border);">
-        <div class="flex justify-between items-center mb-1">
-          <span class="badge badge-blue"><i class="fas fa-bullhorn"></i> ম্যানেজারের নোটিশ</span>
+        <div class="flex justify-between items-center mb-1 flex-wrap gap-2">
+          ${badgeHtml}
           <div class="flex items-center gap-2">
             <span class="text-muted" style="font-size:0.75rem;">${dStr}</span>
-            <button class="btn btn-danger btn-sm btn-del-user-notice" data-id="${n.id}" title="নোটিশটি মুছে ফেলুন" style="padding:2px 8px; font-size:0.72rem; line-height:1;"><i class="fas fa-times"></i></button>
+            <button class="btn btn-danger btn-sm btn-del-user-notice" data-id="${n.id}" title="নোটিশটি মুছে ফেলুন" style="padding:2px 8px; font-size:0.72rem; line-height:1;"><i class="fas fa-trash"></i> মুছুন</button>
           </div>
         </div>
         <p style="margin:0; font-size:0.95rem; line-height:1.5;">${n.message}</p>
@@ -1461,16 +1506,34 @@ function initUserApp() {
     const todayStr = new Date().toISOString().slice(0, 10);
     const weekdaysBn = ['রবি', 'সোম', 'মঙ্গল', 'বুধ', 'বৃহঃ', 'শুক্র', 'শনি'];
 
+    const projects = JSON.parse(localStorage.getItem('meal_projects') || '[]');
+    const curP = projects.find(x => (x.id || x.projectId) === projId);
+    const pAdminId = curP ? String(curP.creator_id || curP.admin_id || curP.adminId) : '';
+
     let members = optMembers;
     if (!members || !members.length) {
       const enrolls = JSON.parse(localStorage.getItem('meal_enrollments') || '[]');
       const users = JSON.parse(localStorage.getItem('meal_users') || '[]');
-      const approvedEnrolls = enrolls.filter(e => String(e.projectId || e.project_id) === String(projId) && String(e.status) === 'approved');
+      const approvedEnrolls = enrolls.filter(e => {
+        const isApproved = String(e.status) === 'approved';
+        const isThisProj = String(e.projectId || e.project_id) === String(projId);
+        const userExists = users.some(u => String(u.id) === String(e.userId || e.user_id));
+        return isApproved && isThisProj && userExists;
+      });
       members = approvedEnrolls.map(e => {
         const uid = String(e.userId || e.user_id);
-        const u = users.find(x => String(x.id) === uid) || { id: uid, name: 'সদস্য (' + uid.slice(0,4) + ')', photo: null };
-        return { id: uid, name: u.name, photo: u.photo };
-      }).sort((a, b) => a.name.localeCompare(b.name));
+        const u = users.find(x => String(x.id) === uid);
+        return { 
+          id: uid, 
+          name: u ? u.name : 'সদস্য', 
+          photo: u ? u.photo : null,
+          isCreator: (uid === pAdminId || (curP && uid === String(curP.creator_id)))
+        };
+      }).sort((a, b) => {
+        if (a.isCreator) return -1;
+        if (b.isCreator) return 1;
+        return a.name.localeCompare(b.name);
+      });
     }
 
     const records = optRecords || JSON.parse(localStorage.getItem('meal_records') || '[]');
@@ -1491,21 +1554,22 @@ function initUserApp() {
     }
 
     // 1. Build Header Row (Top: Member Names!)
-    let headHtml = `<tr><th class="sticky-col" style="min-width:100px;">তারিখ / দিন</th>`;
+    let headHtml = `<tr><th class="sticky-col">তারিখ / দিন</th>`;
     members.forEach(m => {
       const initial = (m.name || 'M').charAt(0).toUpperCase();
       const avatarHtml = m.photo
         ? `<img src="${m.photo}" style="width:26px; height:26px; border-radius:50%; object-fit:cover; border:1px solid var(--glass-border);">`
         : `<div style="width:26px; height:26px; border-radius:50%; background:var(--primary); color:#fff; display:inline-flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700;">${initial}</div>`;
       
-      headHtml += `<th class="tc" style="min-width:105px; padding:10px 8px;">
-        <div style="display:flex; flex-direction:column; align-items:center; gap:4px;">
+      headHtml += `<th class="tc" style="min-width:76px; padding:8px 4px;">
+        <div style="display:flex; flex-direction:column; align-items:center; gap:2px;">
           ${avatarHtml}
-          <span style="font-weight:700; font-size:0.85rem; max-width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${m.name}">${m.name}</span>
+          <span style="font-weight:700; font-size:0.8rem; max-width:85px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${m.name}">${m.name}</span>
+          ${m.isCreator ? '<span style="font-size:0.62rem; color:#f59e0b; font-weight:700; line-height:1;">(এডমিন)</span>' : ''}
         </div>
       </th>`;
     });
-    headHtml += `<th class="sticky-total tc" style="min-width:90px;">দৈনিক মোট</th></tr>`;
+    headHtml += `<th class="sticky-total tc">দৈনিক মোট</th></tr>`;
     thead.innerHTML = headHtml;
 
     // 2. Build Body Rows (Side: Dates 1 to 31!)
