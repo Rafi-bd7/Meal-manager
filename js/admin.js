@@ -481,7 +481,7 @@ function initAdminApp() {
       }
     }));
 
-    // Populate Manager Handover Select
+    // Populate Manager Handover Select (preserve user selection across background syncs)
     const handoverSelect = document.getElementById('handoverNewAdminSelect');
     const mgrDisplay = document.getElementById('currentManagerNameDisplay');
     if (mgrDisplay) {
@@ -491,16 +491,39 @@ function initAdminApp() {
       mgrDisplay.textContent = adminU ? adminU.name : cur.name;
     }
     if (handoverSelect) {
-      handoverSelect.innerHTML = '<option value="">— মেম্বার বাছাই করুন —</option>';
-      const approvedMems = pEnrolls.filter(e => e.status === 'approved');
-      approvedMems.forEach(en => {
-        const uid = en.userId || en.user_id;
-        if (String(uid) === String(cur.id)) return; // Exclude self
-        const u = users.find(x => String(x.id) === String(uid));
-        if (u) {
-          handoverSelect.innerHTML += `<option value="${u.id}">${u.name} (${u.email})</option>`;
+      const currentSelectedVal = handoverSelect.dataset.selectedVal || handoverSelect.value || '';
+
+      // Don't re-render and interrupt if user is actively interacting with the dropdown
+      if (document.activeElement !== handoverSelect) {
+        const approvedMems = pEnrolls.filter(e => e.status === 'approved');
+        let optionsHtml = '<option value="">— মেম্বার বাছাই করুন —</option>';
+        approvedMems.forEach(en => {
+          const uid = en.userId || en.user_id;
+          if (String(uid) === String(cur.id)) return; // Exclude self
+          const u = users.find(x => String(x.id) === String(uid));
+          if (u) {
+            const isCo = (u.role === 'admin');
+            optionsHtml += `<option value="${u.id}">${u.name} (${u.email})${isCo ? ' 👑 (Co-Admin)' : ''}</option>`;
+          }
+        });
+
+        // Only update DOM if options actually changed to avoid flickering and deselecting
+        if (handoverSelect.innerHTML !== optionsHtml) {
+          handoverSelect.innerHTML = optionsHtml;
         }
-      });
+
+        // Restore user's selection stably
+        if (currentSelectedVal) {
+          handoverSelect.value = currentSelectedVal;
+        }
+      }
+
+      if (!handoverSelect.dataset.hasChangeListener) {
+        handoverSelect.dataset.hasChangeListener = 'true';
+        handoverSelect.addEventListener('change', () => {
+          handoverSelect.dataset.selectedVal = handoverSelect.value;
+        });
+      }
     }
   }
 
@@ -568,7 +591,10 @@ function initAdminApp() {
         window.location.href = 'user-dashboard.html';
       } else {
         showToast(`সহ-ম্যানেজার যোগ সফল হয়েছে! ${newAdminName} এখন সহ-অ্যাডমিন।`, 'success');
-        if (sel) sel.value = '';
+        if (sel) {
+          sel.value = '';
+          sel.dataset.selectedVal = '';
+        }
         loadProjects();
         refresh();
       }

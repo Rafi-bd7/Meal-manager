@@ -1,5 +1,5 @@
-// MealManager Service Worker — v21.0
-const CACHE_NAME = 'mealmanager-v21';
+// MealManager Service Worker — v23.0
+const CACHE_NAME = 'mealmanager-v23';
 const OFFLINE_URL = 'login.html';
 
 // Assets to cache immediately on install
