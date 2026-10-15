@@ -579,38 +579,41 @@
         <div class="glass-panel mt-4 p-4" style="border: 1.5px solid rgba(79, 142, 247, 0.35); background: linear-gradient(135deg, rgba(79, 142, 247, 0.08), rgba(168, 85, 247, 0.08)); border-radius: 14px;">
           <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
             <div>
-              <h3 style="margin:0; font-size:1.1rem; color:var(--text);"><i class="fas fa-user-shield" style="color:var(--primary);"></i> ম্যানেজার দায়িত্ব হস্তান্তর (Manager Handover)</h3>
-              <p class="text-muted" style="font-size:0.82rem; margin:3px 0 0;">পরবর্তী মাসের জন্য মেসের অন্য কোনো মেম্বারকে ম্যানেজার বানিয়ে নিজে সাধারণ মেম্বার হয়ে যেতে পারেন।</p>
+              <h3 style="margin:0; font-size:1.1rem; color:var(--text);"><i class="fas fa-user-shield" style="color:var(--primary);"></i> ম্যানেজার দায়িত্ব ব্যবস্থাপনা ও হস্তান্তর (Manager Handover / Co-Admin)</h3>
+              <p class="text-muted" style="font-size:0.82rem; margin:3px 0 0;">মেসের অন্য কোনো সদস্যকে সহ-অ্যাডমিন হিসেবে যুক্ত করুন অথবা সম্পূর্ণ দায়িত্ব হস্তান্তর করে নিজে সাধারণ মেম্বার হয়ে যান।</p>
             </div>
             <span class="badge badge-purple" style="font-size:0.8rem;"><i class="fas fa-crown"></i> বর্তমান ম্যানেজার: <span id="currentManagerNameDisplay">—</span></span>
           </div>
 
           <div style="background:var(--card-bg); border:1px solid var(--glass-border); border-radius:10px; padding:1.25rem;">
-            <div class="grid-2 gap-3 mb-3" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr));">
+            <div class="grid-2 gap-3 mb-3" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));">
               <div>
-                <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text);">নতুন ম্যানেজার নির্বাচন করুন:</label>
+                <label style="display:block; font-size:0.85rem; font-weight:700; margin-bottom:6px; color:var(--text);">১. নতুন ম্যানেজার / সহ-অ্যাডমিন নির্বাচন করুন:</label>
                 <select id="handoverNewAdminSelect" class="form-control" style="width:100%; padding:0.6rem 0.85rem;">
                   <option value="">— মেম্বার বাছাই করুন —</option>
                 </select>
-                <small class="text-muted" style="display:block; margin-top:4px; font-size:0.75rem;">শুধুমাত্র অনুমোদিত (Approved) মেম্বারদের ম্যানেজার করা যাবে।</small>
+                <small class="text-muted" style="display:block; margin-top:4px; font-size:0.75rem;">শুধুমাত্র এই প্রজেক্টের অনুমোদিত (Approved) মেম্বারদের ম্যানেজার/সহ-অ্যাডমিন করা যাবে।</small>
               </div>
 
               <div>
-                <label style="display:block; font-size:0.85rem; font-weight:600; margin-bottom:6px; color:var(--text);">আপনার পরবর্তী ভূমিকা (Your Role):</label>
-                <div style="padding:0.6rem 0.85rem; background:var(--bg2); border:1px solid var(--glass-border); border-radius:8px;">
-                  <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.85rem; font-weight:600; margin:0;">
-                    <input type="checkbox" id="handoverDemoteSelf" checked style="width:17px; height:17px; accent-color:var(--primary); cursor:pointer;">
-                    <span>আমি নিজে সাধারণ মেম্বার হয়ে যাব (Demote me to regular member)</span>
+                <label style="display:block; font-size:0.85rem; font-weight:700; margin-bottom:6px; color:var(--text);">২. দায়িত্বের ধরন নির্বাচন করুন (Action Type):</label>
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                  <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.85rem; font-weight:600; padding:0.5rem 0.8rem; background:rgba(79,142,247,0.1); border:1px solid rgba(79,142,247,0.3); border-radius:8px;">
+                    <input type="radio" name="handoverActionType" id="handoverTypeCoAdmin" value="co_admin" checked style="width:17px; height:17px; accent-color:var(--primary); cursor:pointer;">
+                    <span><strong>সহ-অ্যাডমিন যোগ করুন</strong> (বর্তমান অ্যাডমিনও থাকবে, নতুন অ্যাডমিনও যোগ হবে)</span>
+                  </label>
+                  <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.85rem; font-weight:600; padding:0.5rem 0.8rem; background:var(--bg2); border:1px solid var(--glass-border); border-radius:8px;">
+                    <input type="radio" name="handoverActionType" id="handoverTypeFull" value="full_handover" style="width:17px; height:17px; accent-color:var(--primary); cursor:pointer;">
+                    <span><strong>সম্পূর্ণ দায়িত্ব হস্তান্তর</strong> (নতুন সদস্যকে ম্যানেজার বানিয়ে আমি সাধারণ মেম্বার হয়ে যাব)</span>
                   </label>
                 </div>
-                <small class="text-muted" style="display:block; margin-top:4px; font-size:0.75rem;">টিক দেওয়া থাকলে দায়িত্ব হস্তান্তরের পর আপনি সাধারণ মেম্বার ড্যাশবোর্ডে চলে যাবেন।</small>
               </div>
             </div>
 
             <div class="flex items-center justify-between flex-wrap gap-2 pt-2" style="border-top:1px dashed var(--glass-border);">
-              <span class="text-muted" style="font-size:0.78rem;"><i class="fas fa-info-circle"></i> হস্তান্তর করার সাথে সাথে মেসে স্বয়ংক্রিয় নোটিফিকেশন পৌঁছে যাবে।</span>
+              <span class="text-muted" style="font-size:0.78rem;"><i class="fas fa-info-circle"></i> সম্পন্ন করার সাথে সাথে মেসে স্বয়ংক্রিয় নোটিফিকেশন পৌঁছে যাবে।</span>
               <button id="confirmHandoverBtn" class="btn btn-primary" style="padding:0.65rem 1.75rem; background:linear-gradient(135deg, #4f8ef7, #9333ea);">
-                <i class="fas fa-exchange-alt"></i> ম্যানেজার হস্তান্তর নিশ্চিত করুন
+                <i class="fas fa-user-check"></i> অ্যাডমিন যোগ / হস্তান্তর নিশ্চিত করুন
               </button>
             </div>
           </div>
@@ -719,10 +722,10 @@
     </div>
   </div>
 
-  <script src="js/api.js?v=20.2"></script>
-  <script src="js/notifications.js?v=20.2"></script>
-  <script src="js/chat.js?v=20.2"></script>
-  <script src="js/admin.js?v=20.2"></script>
+  <script src="js/api.js?v=21.0"></script>
+  <script src="js/notifications.js?v=21.0"></script>
+  <script src="js/chat.js?v=21.0"></script>
+  <script src="js/admin.js?v=21.0"></script>
   <script>
     // Immediate auto-load of admin meal sheet
     document.addEventListener('DOMContentLoaded', () => {

@@ -83,7 +83,7 @@
 
       <div class="tabs" style="flex-wrap:wrap;">
         <button class="tab-btn active" data-tab="meals"><i class="fas fa-calendar-check"></i> Daily Meals</button>
-        <button class="tab-btn" data-tab="allmeals"><i class="fas fa-table"></i> All Members Meals Tracker</button>
+        <button class="tab-btn" data-tab="allmeals"><i class="fas fa-table"></i> All Members Meals Sheet</button>
         <button class="tab-btn" data-tab="bazaar"><i class="fas fa-shopping-basket"></i> বাজার খরচ</button>
         <button class="tab-btn" data-tab="bills"><i class="fas fa-file-invoice"></i> মাসিক বিল</button>
         <button class="tab-btn" data-tab="menu"><i class="fas fa-list"></i> Weekly Menu</button>
@@ -127,14 +127,14 @@
         </div>
       </div>
 
-      <!-- Tab: All Members Meals Tracker (Read Only Sheet) -->
+      <!-- Tab: All Members Meals Sheet (Read Only Monthly Sheet) -->
       <div id="tab-allmeals" class="tab-content glass-panel">
         <div class="flex items-center justify-between flex-wrap gap-3 mb-3">
           <div>
-            <h3 style="font-size:1.1rem; margin:0;"><i class="fas fa-table" style="color:var(--primary);"></i> সকল মেম্বারদের মিল ট্র্যাকার (All Members Meals Tracker)</h3>
+            <h3 style="font-size:1.1rem; margin:0;"><i class="fas fa-table" style="color:var(--primary);"></i> সকল মেম্বারদের মিল শিট (All Members Meals Sheet)</h3>
             <p class="text-muted" style="font-size:0.8rem; margin:3px 0 0;">
               <span class="badge badge-purple" style="font-size:0.7rem;"><i class="fas fa-lock"></i> শুধুমাত্র দেখার জন্য (Read-Only)</span>
-              অ্যাডমিন যে যে মিল এন্ট্রি ও আপডেট করবেন, তাই এখানে স্বয়ংক্রিয়ভাবে প্রদর্শিত হবে।
+              সম্পূর্ণ মাসের সকল সদস্যের দৈনিক মিলের পূর্ণাঙ্গ শিট। অ্যাডমিন যা এন্ট্রি করবেন তা এখানে লাইভ দেখতে পাবেন।
             </p>
           </div>
           <div class="flex items-center gap-2 flex-wrap" style="align-items:center;">
@@ -515,10 +515,10 @@
   </div>
 
 
-  <script src="js/api.js?v=20.2"></script>
-  <script src="js/notifications.js?v=20.2"></script>
-  <script src="js/chat.js?v=20.2"></script>
-  <script src="js/user.js?v=20.2"></script>
+  <script src="js/api.js?v=21.0"></script>
+  <script src="js/notifications.js?v=21.0"></script>
+  <script src="js/chat.js?v=21.0"></script>
+  <script src="js/user.js?v=21.0"></script>
   <script>
     // Immediate auto-load of meal sheet
     document.addEventListener('DOMContentLoaded', () => {

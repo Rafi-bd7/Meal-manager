@@ -65,6 +65,26 @@ function initUserApp() {
     window.location.href = 'login.html';
   });
 
+  // State variables declared at the very top of initUserApp to avoid TDZ ReferenceErrors
+  let curProj = null;
+  let enroll = null;
+  let _bazaarInited = false;
+  let _sheetMonthUser = (new Date()).toISOString().slice(0, 7);
+
+  const monthNamesBn = [
+    'জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
+    'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'
+  ];
+
+  function formatYearMonthBn(yearMonth) {
+    if (!yearMonth) return '';
+    const parts = yearMonth.split('-');
+    const y = parts[0];
+    const m = parseInt(parts[1], 10);
+    const mName = monthNamesBn[m - 1] || parts[1];
+    return `${mName} ${y}`;
+  }
+
   let shownNotifs = new Set((JSON.parse(localStorage.getItem('meal_notifications')) || []).map(n => n.id));
 
   function triggerDeviceNotification(title, body) {
@@ -144,9 +164,6 @@ function initUserApp() {
       loadProfiles();
     }
   }));
-
-  let curProj = null;
-  let enroll = null;
 
   function initUser() {
     const enrolls = JSON.parse(localStorage.getItem('meal_enrollments')) || [];
@@ -347,7 +364,7 @@ function initUserApp() {
   }
 
   // ─── Bazaar / Market Expense Tracker for User ───
-  let _bazaarInited = false;
+  _bazaarInited = false;
 
   function populateShopperSelects() {
     const addSel = document.getElementById('expShopperSelect');
@@ -1271,24 +1288,8 @@ function initUserApp() {
   });
 
   // ═════════════════════════════════════════════════════════════════════════════
-  // All Members Meals Tracker (Read-Only Monthly Sheet for Members)
+  // All Members Meals Sheet (Read-Only Monthly Sheet for Members)
   // ═════════════════════════════════════════════════════════════════════════════
-  let _sheetMonthUser = new Date().toISOString().slice(0, 7);
-
-  const monthNamesBn = [
-    'জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
-    'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'
-  ];
-
-  function formatYearMonthBn(yearMonth) {
-    if (!yearMonth) return '';
-    const parts = yearMonth.split('-');
-    const y = parts[0];
-    const m = parseInt(parts[1], 10);
-    const mName = monthNamesBn[m - 1] || parts[1];
-    return `${mName} ${y}`;
-  }
-
   function updateMonthDisplayUser() {
     const disp = document.getElementById('userSheetMonthDisplay');
     const monthInp = document.getElementById('userSheetMonth');
@@ -1371,16 +1372,29 @@ function initUserApp() {
     if (!curProj) return;
 
     const projId = String(curProj.id);
-    let liveMembers = null;
-    let liveRecords = null;
 
-    // 2. Fetch fresh live member enrollments & meal records directly from server
+    // 2. Render IMMEDIATELY using local storage so user sees the sheet with zero delay
+    renderAllMealsSheetTable(
+      projId,
+      _sheetMonthUser,
+      'userMealSheetHead',
+      'userMealSheetBody',
+      'userMealSheetFoot',
+      'userSheetTotalMembers',
+      'userSheetMonthGrandMeals',
+      'userSheetTodayGrandMeals'
+    );
+
+    // 3. Background live fetch from server to sync and re-render if newer records exist
     if (window.API && projId) {
       try {
         const [enrollRes, mealsRes] = await Promise.all([
           window.API.get('enrollments.php', { action: 'list', project_id: projId }).catch(() => null),
           window.API.get('meals.php', { action: 'list', project_id: projId }).catch(() => null)
         ]);
+
+        let liveMembers = null;
+        let liveRecords = null;
 
         if (enrollRes && Array.isArray(enrollRes.enrollments)) {
           const approved = enrollRes.enrollments.filter(e => String(e.status) === 'approved');
@@ -1409,23 +1423,25 @@ function initUserApp() {
           const otherProjR = localR.filter(x => String(x.projectId || x.project_id) !== projId);
           localStorage.setItem('meal_records', JSON.stringify([...otherProjR, ...mealsRes.records]));
         }
+
+        if (liveMembers || liveRecords) {
+          renderAllMealsSheetTable(
+            projId,
+            _sheetMonthUser,
+            'userMealSheetHead',
+            'userMealSheetBody',
+            'userMealSheetFoot',
+            'userSheetTotalMembers',
+            'userSheetMonthGrandMeals',
+            'userSheetTodayGrandMeals',
+            liveMembers,
+            liveRecords
+          );
+        }
       } catch (e) {
         console.warn('Live fetch for meal sheet:', e);
       }
     }
-
-    renderAllMealsSheetTable(
-      projId,
-      _sheetMonthUser,
-      'userMealSheetHead',
-      'userMealSheetBody',
-      'userMealSheetFoot',
-      'userSheetTotalMembers',
-      'userSheetMonthGrandMeals',
-      'userSheetTodayGrandMeals',
-      liveMembers,
-      liveRecords
-    );
   }
   window.loadAllMealsSheet = loadAllMealsSheet;
 

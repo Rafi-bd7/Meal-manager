@@ -504,21 +504,26 @@ function initAdminApp() {
     }
   }
 
-  // Handle Manager Handover Button
+  // Handle Manager Handover & Co-Admin Addition
   document.getElementById('confirmHandoverBtn')?.addEventListener('click', async () => {
     const sel = document.getElementById('handoverNewAdminSelect');
     const newAdminId = sel ? sel.value : '';
-    const demoteSelf = document.getElementById('handoverDemoteSelf')?.checked ?? true;
+    const actionType = document.querySelector('input[name="handoverActionType"]:checked')?.value || 'co_admin';
+    const demoteSelf = (actionType === 'full_handover');
 
     if (!newAdminId) {
-      showToast('দয়া করে নতুন ম্যানেজার নির্বাচন করুন', 'error');
+      showToast('দয়া করে মেম্বার নির্বাচন করুন', 'error');
       return;
     }
     const users = JSON.parse(localStorage.getItem('meal_users')) || [];
     const newAdminUser = users.find(x => String(x.id) === String(newAdminId));
     const newAdminName = newAdminUser ? newAdminUser.name : 'নির্বাচিত সদস্য';
 
-    if (!confirm(`আপনি কি নিশ্চিত যে "${newAdminName}" কে এই মেসের নতুন ম্যানেজার করতে চান?`)) {
+    const confirmMsg = demoteSelf
+      ? `আপনি কি নিশ্চিত যে "${newAdminName}" কে প্রধান ম্যানেজার বানিয়ে নিজে সাধারণ মেম্বার হতে চান?`
+      : `আপনি কি নিশ্চিত যে "${newAdminName}" কে এই মেসের নতুন সহ-ম্যানেজার (Co-Admin) হিসেবে যুক্ত করতে চান? (উভয়েই অ্যাডমিন থাকবেন)`;
+
+    if (!confirm(confirmMsg)) {
       return;
     }
 
@@ -532,39 +537,43 @@ function initAdminApp() {
         });
       }
 
-      // Update local projects
+      // Update local projects if full handover
       const projects = JSON.parse(localStorage.getItem('meal_projects')) || [];
       const pIdx = projects.findIndex(p => (p.id || p.projectId) === curProjId);
-      if (pIdx > -1) {
+      if (pIdx > -1 && demoteSelf) {
         projects[pIdx].admin_id = newAdminId;
         projects[pIdx].adminId = newAdminId;
         localStorage.setItem('meal_projects', JSON.stringify(projects));
       }
 
-      // Update users
+      // Update users list locally
       const uIdx = users.findIndex(u => String(u.id) === String(newAdminId));
       if (uIdx > -1) {
         users[uIdx].role = 'admin';
       }
+
       if (demoteSelf) {
         const myIdx = users.findIndex(u => String(u.id) === String(cur.id));
         if (myIdx > -1) {
           users[myIdx].role = 'user';
         }
         cur.role = 'user';
+        localStorage.setItem('meal_currentUser', JSON.stringify(cur));
         localStorage.setItem('currentUser', JSON.stringify(cur));
       }
       localStorage.setItem('meal_users', JSON.stringify(users));
 
       if (demoteSelf) {
-        alert(`ম্যানেজার হস্তান্তর সফল হয়েছে! নতুন ম্যানেজার: ${newAdminName}\nআপনাকে মেম্বার ড্যাশবোর্ডে নিয়ে যাওয়া হচ্ছে...`);
+        alert(`ম্যানেজার সম্পূর্ণ হস্তান্তর সফল হয়েছে! নতুন ম্যানেজার: ${newAdminName}\nআপনাকে মেম্বার ড্যাশবোর্ডে নিয়ে যাওয়া হচ্ছে...`);
         window.location.href = 'user-dashboard.html';
       } else {
-        showToast(`ম্যানেজার হস্তান্তর সফল হয়েছে! নতুন ম্যানেজার: ${newAdminName}`, 'success');
+        showToast(`সহ-ম্যানেজার যোগ সফল হয়েছে! ${newAdminName} এখন সহ-অ্যাডমিন।`, 'success');
+        if (sel) sel.value = '';
+        loadProjects();
         refresh();
       }
     } catch (err) {
-      showToast(err.message || 'ম্যানেজার পরিবর্তন করতে সমস্যা হয়েছে', 'error');
+      showToast(err.message || 'ম্যানেজার পরিবর্তন/সহ-অ্যাডমিন যোগ করতে সমস্যা হয়েছে', 'error');
     }
   });
 
